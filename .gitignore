@@ -8,5 +8,7 @@
 .externalNativeBuild
 .cxx
 local.properties
-gradle*
-settings.gradle.kts
+gradle/wrapper/
+gradle/gradle-daemon-jvm.properties
+*gradle.*
+gradlew*
