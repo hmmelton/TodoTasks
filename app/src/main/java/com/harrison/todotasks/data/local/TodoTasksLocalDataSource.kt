@@ -21,24 +21,16 @@ class TodoTasksLocalDataSource @Inject constructor(
     private val todoTaskDao: TodoTaskDao,
 ) {
 
-    /** Observes visible tasks that have no parent, in display order. */
-    fun observeTopLevelTasks(): Flow<List<TodoTask>> =
-        todoTaskDao.observeTopLevelTasks().map { tasks -> tasks.map(TodoTaskEntity::asTodoTask) }
+    /** Observes the tasks that are not tombstoned, in display order. */
+    fun observeTasks(): Flow<List<TodoTask>> =
+        todoTaskDao.observeTasks().map { tasks -> tasks.map(TodoTaskEntity::asTodoTask) }
 
-    /** Observes the visible subtasks of [parentId], in display order. */
-    fun observeSubtasks(parentId: String): Flow<List<TodoTask>> =
-        todoTaskDao.observeSubtasks(parentId).map { tasks -> tasks.map(TodoTaskEntity::asTodoTask) }
-
-    /** Observes the task with [id], emitting null if it does not exist or is not visible. */
+    /** Observes the task with [id], emitting null if it does not exist or is tombstoned. */
     fun observeTask(id: String): Flow<TodoTask?> =
         todoTaskDao.observeTask(id).map { task -> task?.asTodoTask() }
 
     /** Returns the task with [id], or null if it does not exist. Includes tombstoned tasks. */
     suspend fun getTask(id: String): TodoTask? = todoTaskDao.getTask(id)?.asTodoTask()
-
-    /** Returns every subtask of [parentId], in no particular order. Includes hidden subtasks. */
-    suspend fun getSubtasks(parentId: String): List<TodoTask> =
-        todoTaskDao.getSubtasks(parentId).map(TodoTaskEntity::asTodoTask)
 
     /** Inserts [task], or replaces the task with the same ID. */
     suspend fun upsertTask(task: TodoTask) = todoTaskDao.upsert(task.asEntity())

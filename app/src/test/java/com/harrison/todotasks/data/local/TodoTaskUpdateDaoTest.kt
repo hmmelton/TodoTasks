@@ -48,7 +48,6 @@ class TodoTaskUpdateDaoTest {
             lastUpdatedAt = 2L,
             deletedAt = 3L,
             dueAt = 4L,
-            parentTaskId = "parent",
             isComplete = true,
             version = 5L,
         )

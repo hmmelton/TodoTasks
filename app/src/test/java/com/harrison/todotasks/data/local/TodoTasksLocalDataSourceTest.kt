@@ -44,24 +44,13 @@ class TodoTasksLocalDataSourceTest {
 
     @Test
     fun `flows expose mapped tasks`() = runTest {
-        val parent = sparseTask.copy(id = "parent")
-        val child = sparseTask.copy(id = "child", parentTaskId = "parent")
+        val first = sparseTask.copy(id = "first")
+        val second = sparseTask.copy(id = "second", createdAt = 2L)
 
-        dataSource.upsertTasks(listOf(parent, child))
+        dataSource.upsertTasks(listOf(first, second))
 
-        assertEquals(listOf(parent), dataSource.observeTopLevelTasks().first())
-        assertEquals(listOf(child), dataSource.observeSubtasks("parent").first())
-        assertEquals(child, dataSource.observeTask("child").first())
-    }
-
-    @Test
-    fun `get subtasks maps every child, including tombstones`() = runTest {
-        val child = sparseTask.copy(id = "child", parentTaskId = "parent")
-        val tombstone = child.copy(id = "tombstone", deletedAt = 5L)
-
-        dataSource.upsertTasks(listOf(sparseTask.copy(id = "parent"), child, tombstone))
-
-        assertEquals(setOf(child, tombstone), dataSource.getSubtasks("parent").toSet())
+        assertEquals(listOf(first, second), dataSource.observeTasks().first())
+        assertEquals(second, dataSource.observeTask("second").first())
     }
 
     @Test

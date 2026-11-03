@@ -21,7 +21,6 @@ fun todoTaskEntity(
     createdAt: Long = 1_000L,
     deletedAt: Long? = null,
     dueAt: Long? = null,
-    parentTaskId: String? = null,
     isComplete: Boolean = false,
     title: String = "Title $id",
 ): TodoTaskEntity = TodoTaskEntity(
@@ -32,7 +31,6 @@ fun todoTaskEntity(
     lastUpdatedAt = createdAt,
     deletedAt = deletedAt,
     dueAt = dueAt,
-    parentTaskId = parentTaskId,
     isComplete = isComplete,
     version = null,
 )
@@ -58,7 +56,6 @@ val fullTask = TodoTask(
     lastUpdatedAt = 2L,
     deletedAt = 3L,
     dueAt = 4L,
-    parentTaskId = "parent-id",
     isComplete = true,
     version = 5L,
 )
@@ -67,7 +64,6 @@ val fullTask = TodoTask(
 val sparseTask = fullTask.copy(
     deletedAt = null,
     dueAt = null,
-    parentTaskId = null,
     isComplete = false,
     version = null,
 )

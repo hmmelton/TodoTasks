@@ -7,8 +7,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Checks that each write commits its tasks and outbox rows together, by failing the last outbox
- * write and expecting every earlier write in the same call to roll back.
+ * Checks that each write commits its task and outbox row together, by failing the outbox write
+ * and expecting the task write in the same call to roll back.
  */
 class TodoTasksRepositoryAtomicityTest : RepositoryTest() {
 
@@ -58,26 +58,6 @@ class TodoTasksRepositoryAtomicityTest : RepositoryTest() {
         assertEquals(synced, tasks.getTask("id"))
         assertEquals(RowCounts(tasks = 1, updates = 0), rowCounts())
     }
-
-    @Test
-    fun `cascade rolls back the parent and every subtask when one subtask's row fails`() =
-        runTest {
-            val seeded = listOf(
-                syncedTask("parent"),
-                syncedTask("first", parentTaskId = "parent"),
-                syncedTask("second", parentTaskId = "parent"),
-                syncedTask("third", parentTaskId = "parent"),
-            )
-            seed(*seeded.toTypedArray())
-            // The parent is written before any subtask, so its tombstone and outbox row (and
-            // possibly other subtasks') are already written when this subtask's row fails.
-            failOutboxWrites("second")
-
-            assertInjectedFailure { repository.deleteTask("parent") }
-
-            seeded.forEach { assertEquals(it, tasks.getTask(it.id)) }
-            assertEquals(RowCounts(tasks = 4, updates = 0), rowCounts())
-        }
 
     private inline fun assertInjectedFailure(write: () -> Unit) {
         val thrown = assertFailsWith<Exception>(write)

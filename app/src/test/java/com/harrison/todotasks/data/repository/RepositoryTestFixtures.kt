@@ -64,7 +64,7 @@ abstract class RepositoryTest {
     /** Stores [task] without an outbox row, as a download would. */
     protected suspend fun seed(vararg task: TodoTask) = tasks.upsertTasks(task.toList())
 
-    /** Counts the rows in the task and outbox tables, including hidden and failed rows. */
+    /** Counts the rows in the task and outbox tables, including tombstoned and failed rows. */
     protected suspend fun rowCounts(): RowCounts = todoTaskDatabase.useReaderConnection { conn ->
         suspend fun count(table: String): Long =
             conn.usePrepared("SELECT COUNT(*) FROM $table") { it.step(); it.getLong(0) }
@@ -76,8 +76,7 @@ abstract class RepositoryTest {
         title: String,
         description: String = "",
         dueAt: Long? = null,
-        parentTaskId: String? = null,
-    ): String = checkNotNull(repository.createTask(title, description, dueAt, parentTaskId)) {
+    ): String = checkNotNull(repository.createTask(title, description, dueAt)) {
         "createTask(\"$title\") was rejected"
     }
 
@@ -117,13 +116,12 @@ data class RowCounts(val tasks: Long, val updates: Long)
 const val INJECTED_FAILURE = "Injected failure"
 
 /** A task as downloaded from the server, so it has a version and is eligible as a base. */
-fun syncedTask(id: String, parentTaskId: String? = null, deletedAt: Long? = null): TodoTask =
+fun syncedTask(id: String, deletedAt: Long? = null): TodoTask =
     sparseTask.copy(
         id = id,
         title = "Title $id",
         createdAt = 100L,
         lastUpdatedAt = 100L,
-        parentTaskId = parentTaskId,
         deletedAt = deletedAt,
         version = 7L,
     )

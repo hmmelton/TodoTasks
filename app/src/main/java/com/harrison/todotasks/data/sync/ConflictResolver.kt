@@ -20,7 +20,7 @@ class ConflictResolver @Inject constructor() {
      * because the server is the final authority.
      *
      * The remaining fields are resolved as follows:
-     * - `id`, `createdAt`, and `parentTaskId` come from [remote].
+     * - `id` and `createdAt` come from [remote].
      * - `version` comes from [remote], so a pending update can rebase on it.
      * - `deletedAt` is set if either side has a tombstone, preferring [remote] if both do. Deletes
      *   win over edits.
@@ -47,7 +47,6 @@ class ConflictResolver @Inject constructor() {
             lastUpdatedAt = maxOf(local.lastUpdatedAt, remote.lastUpdatedAt),
             deletedAt = remote.deletedAt ?: local.deletedAt,
             dueAt = mergeField(base.dueAt, local.dueAt, remote.dueAt, localIsNewer),
-            parentTaskId = remote.parentTaskId,
             isComplete = mergeField(
                 base.isComplete,
                 local.isComplete,

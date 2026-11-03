@@ -2,6 +2,7 @@ package com.harrison.todotasks.data.repository
 
 import android.util.Log
 import androidx.room3.withWriteTransaction
+import androidx.sqlite.SQLiteException
 import com.harrison.todotasks.data.local.TodoTaskDatabase
 import com.harrison.todotasks.data.local.TodoTaskSyncLocalDataSource
 import com.harrison.todotasks.data.local.TodoTasksLocalDataSource
@@ -26,11 +27,10 @@ private const val TAG = "TodoTasksRepository"
  * Writes validate against the stored tasks inside that transaction, and never throw for a bad
  * request. A rejected write writes nothing, logs a warning, and returns null or false. A write
  * that would change nothing, or that completes or deletes a task that is gone, is a no-op: it
- * writes nothing, not even an outbox row. Database failures still throw, after rolling back the
- * transaction.
+ * writes nothing, not even an outbox row. Database failures still throw a [SQLiteException],
+ * after rolling back the transaction.
  *
- * A task is visible unless it or its parent is tombstoned, as in the queries of the local data
- * source. Only visible tasks can be edited, because they are the only ones the UI can show.
+ * Only tasks that are not deleted can be edited, because they are the only ones the UI can show.
  */
 @Singleton
 class TodoTasksRepository @Inject constructor(
@@ -40,46 +40,24 @@ class TodoTasksRepository @Inject constructor(
     private val clock: Clock,
 ) {
 
-    /** Observes visible tasks that have no parent, in display order. */
-    fun observeTopLevelTasks(): Flow<List<TodoTask>> = tasksLocalDataSource.observeTopLevelTasks()
+    /** Observes the tasks that are not deleted, in display order. */
+    fun observeTasks(): Flow<List<TodoTask>> = tasksLocalDataSource.observeTasks()
 
-    /** Observes the visible subtasks of [parentId], in display order. */
-    fun observeSubtasks(parentId: String): Flow<List<TodoTask>> =
-        tasksLocalDataSource.observeSubtasks(parentId)
-
-    /** Observes the task with [id], emitting null if it does not exist or is not visible. */
+    /** Observes the task with [id], emitting null if it does not exist or is deleted. */
     fun observeTask(id: String): Flow<TodoTask?> = tasksLocalDataSource.observeTask(id)
 
     /**
      * Creates an incomplete task and queues it for upload.
      *
-     * @param parentTaskId The parent of a subtask, or null for a top-level task. Subtasks are one
-     * level deep.
-     * @return The ID of the new task, or null if it was rejected because [title] is blank or
-     * [parentTaskId] is not a visible top-level task.
+     * @return The ID of the new task, or null if it was rejected because [title] is blank.
+     * @throws SQLiteException if the database write fails. Nothing is written.
      */
-    suspend fun createTask(
-        title: String,
-        description: String = "",
-        dueAt: Long? = null,
-        parentTaskId: String? = null,
-    ): String? {
+    suspend fun createTask(title: String, description: String = "", dueAt: Long? = null): String? {
         if (title.isBlank()) {
             Log.w(TAG, "Rejected createTask: blank title")
             return null
         }
         return todoTaskDatabase.withWriteTransaction {
-            if (parentTaskId != null) {
-                val parent = getVisibleTask(parentTaskId)
-                if (parent == null) {
-                    Log.w(TAG, "Rejected createTask: parent $parentTaskId is missing or hidden")
-                    return@withWriteTransaction null
-                }
-                if (parent.parentTaskId != null) {
-                    Log.w(TAG, "Rejected createTask: parent $parentTaskId is a subtask")
-                    return@withWriteTransaction null
-                }
-            }
             val now = clock.millis()
             val task = TodoTask(
                 id = UUID.randomUUID().toString(),
@@ -89,7 +67,6 @@ class TodoTasksRepository @Inject constructor(
                 lastUpdatedAt = now,
                 deletedAt = null,
                 dueAt = dueAt,
-                parentTaskId = parentTaskId,
                 isComplete = false,
                 version = null,
             )
@@ -103,7 +80,8 @@ class TodoTasksRepository @Inject constructor(
      * for upload. Does nothing if the values are unchanged.
      *
      * @return True if the edit was saved or changed nothing, or false if nothing was saved because
-     * [title] is blank or the task is missing or not visible.
+     * [title] is blank or the task is missing or deleted.
+     * @throws SQLiteException if the database write fails. Nothing is written.
      */
     suspend fun updateTask(id: String, title: String, description: String, dueAt: Long?): Boolean {
         if (title.isBlank()) {
@@ -111,9 +89,9 @@ class TodoTasksRepository @Inject constructor(
             return false
         }
         return todoTaskDatabase.withWriteTransaction {
-            val previous = getVisibleTask(id)
+            val previous = getLiveTask(id)
             if (previous == null) {
-                Log.w(TAG, "Rejected updateTask: task $id is missing or hidden")
+                Log.w(TAG, "Rejected updateTask: task $id is missing or deleted")
                 return@withWriteTransaction false
             }
             saveEditIfChanged(
@@ -129,13 +107,14 @@ class TodoTasksRepository @Inject constructor(
      * nothing if it is already in that state.
      *
      * @return True if the change was saved or changed nothing, or false if nothing was saved
-     * because the task is missing or not visible.
+     * because the task is missing or deleted.
+     * @throws SQLiteException if the database write fails. Nothing is written.
      */
     suspend fun setComplete(id: String, isComplete: Boolean): Boolean =
         todoTaskDatabase.withWriteTransaction {
-            val previous = getVisibleTask(id)
+            val previous = getLiveTask(id)
             if (previous == null) {
-                Log.w(TAG, "Rejected setComplete: task $id is missing or hidden")
+                Log.w(TAG, "Rejected setComplete: task $id is missing or deleted")
                 return@withWriteTransaction false
             }
             saveEditIfChanged(previous, previous.copy(isComplete = isComplete))
@@ -143,37 +122,22 @@ class TodoTasksRepository @Inject constructor(
         }
 
     /**
-     * Tombstones the task with [id] and queues the delete for upload. Deleting a top-level task
-     * also tombstones each of its subtasks that isn't already deleted, each with its own outbox
-     * row, so the server learns of every delete. Does nothing if the task is missing or already
-     * deleted.
+     * Tombstones the task with [id] and queues the delete for upload. Does nothing if the task is
+     * missing or already deleted.
+     *
+     * @throws SQLiteException if the database write fails. Nothing is written.
      */
     suspend fun deleteTask(id: String) {
         todoTaskDatabase.withWriteTransaction {
-            val task = tasksLocalDataSource.getTask(id)
-            if (task == null || task.deletedAt != null) return@withWriteTransaction
-
-            val subtasks = if (task.parentTaskId == null) {
-                tasksLocalDataSource.getSubtasks(id)
-            } else {
-                emptyList()
-            }
+            val previous = getLiveTask(id) ?: return@withWriteTransaction
             val now = clock.millis()
-            (listOf(task) + subtasks)
-                .filter { it.deletedAt == null }
-                .forEach { previous ->
-                    saveEdit(previous, previous.copy(deletedAt = now, lastUpdatedAt = now))
-                }
+            saveEdit(previous, previous.copy(deletedAt = now, lastUpdatedAt = now))
         }
     }
 
-    /** Returns the task with [id], or null if it does not exist or is not visible. */
-    private suspend fun getVisibleTask(id: String): TodoTask? {
-        val task = tasksLocalDataSource.getTask(id) ?: return null
-        if (task.deletedAt != null) return null
-        val parentId = task.parentTaskId ?: return task
-        return task.takeIf { tasksLocalDataSource.getTask(parentId)?.deletedAt == null }
-    }
+    /** Returns the task with [id], or null if it does not exist or is deleted. */
+    private suspend fun getLiveTask(id: String): TodoTask? =
+        tasksLocalDataSource.getTask(id)?.takeIf { it.deletedAt == null }
 
     /** Saves [edited] with a new `lastUpdatedAt`, unless it is the same as [previous]. */
     private suspend fun saveEditIfChanged(previous: TodoTask, edited: TodoTask) {
