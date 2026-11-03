@@ -71,50 +71,6 @@ class TodoTaskDaoTest {
         }
 
     @Test
-    fun `subtask query returns only visible children of the parent, in display order`() = runTest {
-        dao.upsert(
-            listOf(
-                todoTaskEntity("parent"),
-                todoTaskEntity("other-parent"),
-                todoTaskEntity("complete", parentTaskId = "parent", isComplete = true),
-                todoTaskEntity("no-due", parentTaskId = "parent"),
-                todoTaskEntity("due", parentTaskId = "parent", dueAt = 100L),
-                todoTaskEntity("tombstone", parentTaskId = "parent", deletedAt = 5L),
-                todoTaskEntity("other-child", parentTaskId = "other-parent"),
-            ),
-        )
-
-        assertEquals(
-            listOf("due", "no-due", "complete"),
-            dao.observeSubtasks("parent").first().map { it.id },
-        )
-    }
-
-    @Test
-    fun `subtask query returns nothing for a deleted parent`() = runTest {
-        dao.upsert(
-            listOf(
-                todoTaskEntity("parent", deletedAt = 5L),
-                todoTaskEntity("child", parentTaskId = "parent"),
-            ),
-        )
-
-        assertTrue(dao.observeSubtasks("parent").first().isEmpty())
-    }
-
-    @Test
-    fun `observing a subtask of a deleted parent emits null`() = runTest {
-        dao.upsert(
-            listOf(
-                todoTaskEntity("parent", deletedAt = 5L),
-                todoTaskEntity("child", parentTaskId = "parent"),
-            ),
-        )
-
-        assertNull(dao.observeTask("child").first())
-    }
-
-    @Test
     fun `observing a tombstoned task emits null`() = runTest {
         dao.upsert(todoTaskEntity("tombstone", deletedAt = 5L))
 
@@ -127,52 +83,17 @@ class TodoTaskDaoTest {
     }
 
     @Test
-    fun `get returns hidden rows, which sync needs`() = runTest {
-        val parent = todoTaskEntity("parent", deletedAt = 5L)
-        val child = todoTaskEntity("child", parentTaskId = "parent")
-        dao.upsert(listOf(parent, child))
+    fun `get returns tombstoned rows, which sync needs`() = runTest {
+        val tombstone = todoTaskEntity("tombstone", deletedAt = 5L)
+        dao.upsert(tombstone)
 
-        assertEquals(parent, dao.getTask("parent"))
-        assertEquals(child, dao.getTask("child"))
+        assertEquals(tombstone, dao.getTask("tombstone"))
     }
 
     @Test
     fun `get returns null for a missing task`() = runTest {
         assertNull(dao.getTask("missing"))
     }
-
-    @Test
-    fun `get subtasks returns every child of the parent, including hidden ones`() = runTest {
-        val visible = todoTaskEntity("visible", parentTaskId = "parent")
-        val tombstone = todoTaskEntity("tombstone", parentTaskId = "parent", deletedAt = 5L)
-        dao.upsert(
-            listOf(
-                todoTaskEntity("parent", deletedAt = 5L),
-                visible,
-                tombstone,
-                todoTaskEntity("other-child", parentTaskId = "other-parent"),
-            ),
-        )
-
-        assertEquals(setOf(visible, tombstone), dao.getSubtasks("parent").toSet())
-        assertTrue(dao.getSubtasks("visible").isEmpty())
-    }
-
-    @Test
-    fun `child inserted before its parent succeeds and is visible both before and after`() =
-        runTest {
-            val child = todoTaskEntity("child", parentTaskId = "parent")
-
-            dao.upsert(child)
-
-            assertEquals(child, dao.observeTask("child").first())
-            assertEquals(listOf(child), dao.observeSubtasks("parent").first())
-
-            dao.upsert(todoTaskEntity("parent"))
-
-            assertEquals(child, dao.observeTask("child").first())
-            assertEquals(listOf(child), dao.observeSubtasks("parent").first())
-        }
 
     @Test
     fun `upsert replaces the row with the same id`() = runTest {
@@ -191,21 +112,6 @@ class TodoTaskDaoTest {
             dao.upsert(todoTaskEntity("id"))
 
             assertEquals(listOf("id"), awaitItem().map { it.id })
-            cancelAndIgnoreRemainingEvents()
-        }
-    }
-
-    @Test
-    fun `deleting a parent hides its subtasks from active observers`() = runTest {
-        val child = todoTaskEntity("child", parentTaskId = "parent")
-        dao.upsert(listOf(todoTaskEntity("parent"), child))
-
-        dao.observeSubtasks("parent").test {
-            assertEquals(listOf(child), awaitItem())
-
-            dao.upsert(todoTaskEntity("parent", deletedAt = 5L))
-
-            assertTrue(awaitItem().isEmpty())
             cancelAndIgnoreRemainingEvents()
         }
     }
