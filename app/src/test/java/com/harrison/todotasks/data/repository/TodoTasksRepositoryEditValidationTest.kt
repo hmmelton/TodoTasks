@@ -37,17 +37,6 @@ class TodoTasksRepositoryEditValidationTest : RepositoryTest() {
     }
 
     @Test
-    fun `update of a subtask hidden by its deleted parent is rejected`() = runTest {
-        seed(syncedTask("parent", deletedAt = 50L), syncedTask("child", parentTaskId = "parent"))
-
-        assertWritesNothing("parent", "child") {
-            assertFalse(
-                repository.updateTask("child", title = "Title", description = "", dueAt = null),
-            )
-        }
-    }
-
-    @Test
     fun `completing a missing task is rejected`() = runTest {
         assertWritesNothing("missing") {
             assertFalse(repository.setComplete("missing", isComplete = true))
@@ -59,15 +48,6 @@ class TodoTasksRepositoryEditValidationTest : RepositoryTest() {
         seed(syncedTask("id", deletedAt = 50L))
 
         assertWritesNothing("id") { assertFalse(repository.setComplete("id", isComplete = true)) }
-    }
-
-    @Test
-    fun `completing a subtask hidden by its deleted parent is rejected`() = runTest {
-        seed(syncedTask("parent", deletedAt = 50L), syncedTask("child", parentTaskId = "parent"))
-
-        assertWritesNothing("parent", "child") {
-            assertFalse(repository.setComplete("child", isComplete = true))
-        }
     }
 
     @Test
