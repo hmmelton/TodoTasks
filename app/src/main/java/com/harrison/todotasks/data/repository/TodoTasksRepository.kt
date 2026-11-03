@@ -40,7 +40,7 @@ class TodoTasksRepository @Inject constructor(
 ) {
 
     /** Observes the tasks that are not deleted, in display order. */
-    fun observeTopLevelTasks(): Flow<List<TodoTask>> = tasksLocalDataSource.observeTopLevelTasks()
+    fun observeTasks(): Flow<List<TodoTask>> = tasksLocalDataSource.observeTasks()
 
     /** Observes the task with [id], emitting null if it does not exist or is deleted. */
     fun observeTask(id: String): Flow<TodoTask?> = tasksLocalDataSource.observeTask(id)

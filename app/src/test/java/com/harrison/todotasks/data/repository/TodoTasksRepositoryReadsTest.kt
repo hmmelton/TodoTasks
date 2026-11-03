@@ -11,8 +11,8 @@ import org.junit.Test
 class TodoTasksRepositoryReadsTest : RepositoryTest() {
 
     @Test
-    fun `top-level tasks show created tasks and drop deleted ones`() = runTest {
-        repository.observeTopLevelTasks().test {
+    fun `tasks show created tasks and drop deleted ones`() = runTest {
+        repository.observeTasks().test {
             assertTrue(awaitItem().isEmpty())
 
             val id = createTask(title = "Task")

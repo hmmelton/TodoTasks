@@ -49,7 +49,7 @@ class TodoTasksLocalDataSourceTest {
 
         dataSource.upsertTasks(listOf(first, second))
 
-        assertEquals(listOf(first, second), dataSource.observeTopLevelTasks().first())
+        assertEquals(listOf(first, second), dataSource.observeTasks().first())
         assertEquals(second, dataSource.observeTask("second").first())
     }
 

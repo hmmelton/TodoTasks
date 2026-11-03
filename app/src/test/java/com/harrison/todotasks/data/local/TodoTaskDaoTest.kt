@@ -31,20 +31,14 @@ class TodoTaskDaoTest {
     }
 
     @Test
-    fun `top-level query excludes subtasks and tombstones`() = runTest {
-        dao.upsert(
-            listOf(
-                todoTaskEntity("visible"),
-                todoTaskEntity("subtask", parentTaskId = "visible"),
-                todoTaskEntity("tombstone", deletedAt = 5L),
-            ),
-        )
+    fun `tasks query excludes tombstones`() = runTest {
+        dao.upsert(listOf(todoTaskEntity("live"), todoTaskEntity("tombstone", deletedAt = 5L)))
 
-        assertEquals(listOf("visible"), dao.observeTopLevelTasks().first().map { it.id })
+        assertEquals(listOf("live"), dao.observeTasks().first().map { it.id })
     }
 
     @Test
-    fun `top-level query orders incomplete first, then due date with nulls last, then created`() =
+    fun `tasks query orders incomplete first, then due date with nulls last, then created`() =
         runTest {
             dao.upsert(
                 listOf(
@@ -66,7 +60,7 @@ class TodoTaskDaoTest {
                     "no-due-newer",
                     "complete-due-soonest",
                 ),
-                dao.observeTopLevelTasks().first().map { it.id },
+                dao.observeTasks().first().map { it.id },
             )
         }
 
@@ -101,12 +95,12 @@ class TodoTaskDaoTest {
 
         dao.upsert(todoTaskEntity("id", title = "New"))
 
-        assertEquals(listOf("New"), dao.observeTopLevelTasks().first().map { it.title })
+        assertEquals(listOf("New"), dao.observeTasks().first().map { it.title })
     }
 
     @Test
-    fun `top-level flow re-emits on write`() = runTest {
-        dao.observeTopLevelTasks().test {
+    fun `tasks flow re-emits on write`() = runTest {
+        dao.observeTasks().test {
             assertTrue(awaitItem().isEmpty())
 
             dao.upsert(todoTaskEntity("id"))

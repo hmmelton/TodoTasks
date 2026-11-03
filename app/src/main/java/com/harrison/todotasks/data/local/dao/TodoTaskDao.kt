@@ -13,12 +13,9 @@ private const val DISPLAY_ORDER = "is_complete ASC, due_at IS NULL ASC, due_at A
 @Dao
 interface TodoTaskDao {
 
-    /** Observes the tasks that have no parent and are not tombstoned, in display order. */
-    @Query(
-        "SELECT * FROM todo_tasks WHERE deleted_at IS NULL AND parent_task_id IS NULL " +
-            "ORDER BY $DISPLAY_ORDER",
-    )
-    fun observeTopLevelTasks(): Flow<List<TodoTaskEntity>>
+    /** Observes the tasks that are not tombstoned, in display order. */
+    @Query("SELECT * FROM todo_tasks WHERE deleted_at IS NULL ORDER BY $DISPLAY_ORDER")
+    fun observeTasks(): Flow<List<TodoTaskEntity>>
 
     /** Observes the task with [id], emitting null if it does not exist or is tombstoned. */
     @Query("SELECT * FROM todo_tasks WHERE id = :id AND deleted_at IS NULL")

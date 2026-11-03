@@ -21,9 +21,9 @@ class TodoTasksLocalDataSource @Inject constructor(
     private val todoTaskDao: TodoTaskDao,
 ) {
 
-    /** Observes the tasks that have no parent and are not tombstoned, in display order. */
-    fun observeTopLevelTasks(): Flow<List<TodoTask>> =
-        todoTaskDao.observeTopLevelTasks().map { tasks -> tasks.map(TodoTaskEntity::asTodoTask) }
+    /** Observes the tasks that are not tombstoned, in display order. */
+    fun observeTasks(): Flow<List<TodoTask>> =
+        todoTaskDao.observeTasks().map { tasks -> tasks.map(TodoTaskEntity::asTodoTask) }
 
     /** Observes the task with [id], emitting null if it does not exist or is tombstoned. */
     fun observeTask(id: String): Flow<TodoTask?> =
