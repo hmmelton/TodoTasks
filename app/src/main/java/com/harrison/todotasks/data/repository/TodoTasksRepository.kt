@@ -2,6 +2,7 @@ package com.harrison.todotasks.data.repository
 
 import android.util.Log
 import androidx.room3.withWriteTransaction
+import androidx.sqlite.SQLiteException
 import com.harrison.todotasks.data.local.TodoTaskDatabase
 import com.harrison.todotasks.data.local.TodoTaskSyncLocalDataSource
 import com.harrison.todotasks.data.local.TodoTasksLocalDataSource
@@ -26,8 +27,8 @@ private const val TAG = "TodoTasksRepository"
  * Writes validate against the stored tasks inside that transaction, and never throw for a bad
  * request. A rejected write writes nothing, logs a warning, and returns null or false. A write
  * that would change nothing, or that completes or deletes a task that is gone, is a no-op: it
- * writes nothing, not even an outbox row. Database failures still throw, after rolling back the
- * transaction.
+ * writes nothing, not even an outbox row. Database failures still throw a [SQLiteException],
+ * after rolling back the transaction.
  *
  * Only tasks that are not deleted can be edited, because they are the only ones the UI can show.
  */
@@ -49,6 +50,7 @@ class TodoTasksRepository @Inject constructor(
      * Creates an incomplete task and queues it for upload.
      *
      * @return The ID of the new task, or null if it was rejected because [title] is blank.
+     * @throws SQLiteException if the database write fails. Nothing is written.
      */
     suspend fun createTask(title: String, description: String = "", dueAt: Long? = null): String? {
         if (title.isBlank()) {
@@ -79,6 +81,7 @@ class TodoTasksRepository @Inject constructor(
      *
      * @return True if the edit was saved or changed nothing, or false if nothing was saved because
      * [title] is blank or the task is missing or deleted.
+     * @throws SQLiteException if the database write fails. Nothing is written.
      */
     suspend fun updateTask(id: String, title: String, description: String, dueAt: Long?): Boolean {
         if (title.isBlank()) {
@@ -105,6 +108,7 @@ class TodoTasksRepository @Inject constructor(
      *
      * @return True if the change was saved or changed nothing, or false if nothing was saved
      * because the task is missing or deleted.
+     * @throws SQLiteException if the database write fails. Nothing is written.
      */
     suspend fun setComplete(id: String, isComplete: Boolean): Boolean =
         todoTaskDatabase.withWriteTransaction {
@@ -120,6 +124,8 @@ class TodoTasksRepository @Inject constructor(
     /**
      * Tombstones the task with [id] and queues the delete for upload. Does nothing if the task is
      * missing or already deleted.
+     *
+     * @throws SQLiteException if the database write fails. Nothing is written.
      */
     suspend fun deleteTask(id: String) {
         todoTaskDatabase.withWriteTransaction {
