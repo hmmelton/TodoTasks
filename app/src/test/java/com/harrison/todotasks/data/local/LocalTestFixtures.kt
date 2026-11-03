@@ -1,7 +1,19 @@
 package com.harrison.todotasks.data.local
 
+import androidx.room3.Room
+import androidx.sqlite.driver.AndroidSQLiteDriver
+import androidx.test.core.app.ApplicationProvider
 import com.harrison.todotasks.data.local.entities.TodoTaskEntity
 import com.harrison.todotasks.data.model.TodoTask
+
+/** Builds an in-memory database with the same driver as production. */
+fun inMemoryTodoTaskDatabase(): TodoTaskDatabase =
+    Room.inMemoryDatabaseBuilder(
+        ApplicationProvider.getApplicationContext(),
+        TodoTaskDatabase::class.java,
+    )
+        .setDriver(AndroidSQLiteDriver())
+        .build()
 
 fun todoTaskEntity(
     id: String,
