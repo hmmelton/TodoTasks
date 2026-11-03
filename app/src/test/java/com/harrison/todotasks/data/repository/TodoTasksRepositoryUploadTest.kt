@@ -2,15 +2,19 @@ package com.harrison.todotasks.data.repository
 
 import com.harrison.todotasks.data.local.entities.asEntity
 import com.harrison.todotasks.data.local.todoTaskUpdate
+import com.harrison.todotasks.data.network.respondJson
 import com.harrison.todotasks.data.network.respondTask
 import com.harrison.todotasks.data.network.sentTask
 import io.ktor.client.engine.mock.MockRequestHandleScope
+import io.ktor.client.plugins.ResponseException
 import io.ktor.client.request.HttpRequestData
 import io.ktor.client.request.HttpResponseData
 import io.ktor.http.HttpStatusCode
+import java.io.IOException
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -127,6 +131,94 @@ class TodoTasksRepositoryUploadTest : RepositoryTest() {
         assertEquals(RowCounts(tasks = 1, updates = 0), rowCounts())
     }
 
+    @Test
+    fun `4xx marks the row failed and later rows are still uploaded`() = runTest {
+        val rejected = createTask(title = "Rejected")
+        val accepted = createTask(title = "Accepted")
+        val before = tasks.getTask(rejected)
+        clock.nowMillis = 5_000L
+        respond = { request ->
+            when (request.sentTask().id) {
+                rejected -> respondJson("{}", HttpStatusCode.BadRequest)
+                else -> accept(request, version = 1L)
+            }
+        }
+
+        assertTrue(repository.uploadPendingChanges())
+
+        assertEquals(before, tasks.getTask(rejected))
+        assertEquals(todoTaskUpdate(rejected, failedAt = 5_000L), sync.getTaskUpdate(rejected))
+        assertEquals(null, sync.getTaskUpdate(accepted))
+        assertEquals(1L, tasks.getTask(accepted)?.version)
+    }
+
+    @Test
+    fun `IOException propagates and leaves the outbox untouched`() = runTest {
+        val first = createTask(title = "First")
+        val second = createTask(title = "Second")
+        respond = { throw IOException("Offline") }
+
+        assertWritesNothing(first, second) {
+            assertFailsWith<IOException> { repository.uploadPendingChanges() }
+        }
+
+        assertEquals(1, server.requests.size)
+    }
+
+    @Test
+    fun `5xx propagates and leaves the outbox untouched`() = runTest {
+        val first = createTask(title = "First")
+        val second = createTask(title = "Second")
+        respond = { respondJson("{}", HttpStatusCode.InternalServerError) }
+
+        assertWritesNothing(first, second) {
+            val thrown = assertFailsWith<ResponseException> { repository.uploadPendingChanges() }
+            assertEquals(HttpStatusCode.InternalServerError, thrown.response.status)
+        }
+
+        assertEquals(1, server.requests.size)
+    }
+
+    @Test
+    fun `deleted task uploads its tombstone`() = runTest {
+        seed(syncedTask("id"))
+        clock.nowMillis = 2_000L
+        repository.deleteTask("id")
+        respond = { request -> accept(request, version = 8L) }
+
+        assertTrue(repository.uploadPendingChanges())
+        assertEquals(2_000L, server.requests.single().sentTask().deletedAt)
+        val local = tasks.getTask("id")
+        assertNotNull(local?.deletedAt)
+        assertEquals(8L, local?.version)
+        assertEquals(RowCounts(tasks = 1, updates = 0), rowCounts())
+    }
+
+    @Test
+    fun `failed rows are skipped`() = runTest {
+        val failed = createTask(title = "Failed")
+        val pending = createTask(title = "Pending")
+        sync.markTaskUpdateFailedIfRevisionMatches(failed, revision = 1L, failedAt = 9L)
+        respond = { request -> accept(request, version = 1L) }
+
+        repository.uploadPendingChanges()
+
+        assertEquals(listOf(pending), server.requests.map { it.sentTask().id })
+        assertEquals(todoTaskUpdate(failed, failedAt = 9L), sync.getTaskUpdate(failed))
+    }
+
+    @Test
+    fun `rows are uploaded oldest first, even after a later edit`() = runTest {
+        val a = createTask(title = "A")
+        val b = createTask(title = "B")
+        val c = createTask(title = "C")
+        repository.setComplete(a, isComplete = true)
+        respond = { request -> accept(request, version = 1L) }
+
+        repository.uploadPendingChanges()
+
+        assertEquals(listOf(a, b, c), server.requests.map { it.sentTask().id })
+    }
 
     /** Accepts the upload in [request], storing it at [version] as the server would. */
     private suspend fun MockRequestHandleScope.accept(
