@@ -36,6 +36,10 @@ class TodoTasksLocalDataSource @Inject constructor(
     /** Returns the task with [id], or null if it does not exist. Includes tombstoned tasks. */
     suspend fun getTask(id: String): TodoTask? = todoTaskDao.getTask(id)?.asTodoTask()
 
+    /** Returns every subtask of [parentId], in no particular order. Includes hidden subtasks. */
+    suspend fun getSubtasks(parentId: String): List<TodoTask> =
+        todoTaskDao.getSubtasks(parentId).map(TodoTaskEntity::asTodoTask)
+
     /** Inserts [task], or replaces the task with the same ID. */
     suspend fun upsertTask(task: TodoTask) = todoTaskDao.upsert(task.asEntity())
 

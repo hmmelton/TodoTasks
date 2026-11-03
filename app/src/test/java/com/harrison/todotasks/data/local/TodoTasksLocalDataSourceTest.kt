@@ -55,6 +55,16 @@ class TodoTasksLocalDataSourceTest {
     }
 
     @Test
+    fun `get subtasks maps every child, including tombstones`() = runTest {
+        val child = sparseTask.copy(id = "child", parentTaskId = "parent")
+        val tombstone = child.copy(id = "tombstone", deletedAt = 5L)
+
+        dataSource.upsertTasks(listOf(sparseTask.copy(id = "parent"), child, tombstone))
+
+        assertEquals(setOf(child, tombstone), dataSource.getSubtasks("parent").toSet())
+    }
+
+    @Test
     fun `observed task re-emits on write`() = runTest {
         dataSource.observeTask(sparseTask.id).test {
             assertNull(awaitItem())

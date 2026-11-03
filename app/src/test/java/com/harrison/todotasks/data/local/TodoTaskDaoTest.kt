@@ -142,6 +142,23 @@ class TodoTaskDaoTest {
     }
 
     @Test
+    fun `get subtasks returns every child of the parent, including hidden ones`() = runTest {
+        val visible = todoTaskEntity("visible", parentTaskId = "parent")
+        val tombstone = todoTaskEntity("tombstone", parentTaskId = "parent", deletedAt = 5L)
+        dao.upsert(
+            listOf(
+                todoTaskEntity("parent", deletedAt = 5L),
+                visible,
+                tombstone,
+                todoTaskEntity("other-child", parentTaskId = "other-parent"),
+            ),
+        )
+
+        assertEquals(setOf(visible, tombstone), dao.getSubtasks("parent").toSet())
+        assertTrue(dao.getSubtasks("visible").isEmpty())
+    }
+
+    @Test
     fun `child inserted before its parent succeeds and is visible both before and after`() =
         runTest {
             val child = todoTaskEntity("child", parentTaskId = "parent")
