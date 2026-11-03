@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 1,
-    "identityHash": "aaa6d269fd54237e0fdbe17cb121b9d2",
+    "identityHash": "6e6ae30e423f5d979fa5c4dad03a68d6",
     "entities": [
       {
         "tableName": "todo_tasks",
@@ -170,11 +170,35 @@
             "task_id"
           ]
         }
+      },
+      {
+        "tableName": "sync_state",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER NOT NULL, `cursor` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "cursor",
+            "columnName": "cursor",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        }
       }
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'aaa6d269fd54237e0fdbe17cb121b9d2')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '6e6ae30e423f5d979fa5c4dad03a68d6')"
     ]
   }
 }

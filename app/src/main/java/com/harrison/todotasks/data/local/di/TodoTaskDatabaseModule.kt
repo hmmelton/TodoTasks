@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room3.Room
 import androidx.sqlite.driver.AndroidSQLiteDriver
 import com.harrison.todotasks.data.local.TodoTaskDatabase
+import com.harrison.todotasks.data.local.dao.SyncStateDao
 import com.harrison.todotasks.data.local.dao.TodoTaskDao
 import com.harrison.todotasks.data.local.dao.TodoTaskUpdateDao
 import dagger.Module
@@ -37,4 +38,9 @@ object TodoTaskDatabaseModule {
     @Provides
     fun provideTodoTaskUpdateDao(todoTaskDatabase: TodoTaskDatabase): TodoTaskUpdateDao =
         todoTaskDatabase.todoTaskUpdateDao()
+
+    /** Provides the [SyncStateDao] from [todoTaskDatabase]. */
+    @Provides
+    fun provideSyncStateDao(todoTaskDatabase: TodoTaskDatabase): SyncStateDao =
+        todoTaskDatabase.syncStateDao()
 }
