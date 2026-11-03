@@ -25,8 +25,9 @@ private const val TAG = "TodoTasksRepository"
  *
  * Writes validate against the stored tasks inside that transaction, and never throw for a bad
  * request. A rejected write writes nothing, logs a warning, and returns null or false. A write
- * that would change nothing is a no-op: it writes nothing, not even an outbox row. Database
- * failures still throw, after rolling back the transaction.
+ * that would change nothing, or that completes or deletes a task that is gone, is a no-op: it
+ * writes nothing, not even an outbox row. Database failures still throw, after rolling back the
+ * transaction.
  *
  * A task is visible unless it or its parent is tombstoned, as in the queries of the local data
  * source. Only visible tasks can be edited, because they are the only ones the UI can show.
@@ -120,6 +121,49 @@ class TodoTasksRepository @Inject constructor(
                 previous.copy(title = title, description = description, dueAt = dueAt),
             )
             true
+        }
+    }
+
+    /**
+     * Marks the task with [id] complete or incomplete, and queues the change for upload. Does
+     * nothing if it is already in that state.
+     *
+     * @return True if the change was saved or changed nothing, or false if nothing was saved
+     * because the task is missing or not visible.
+     */
+    suspend fun setComplete(id: String, isComplete: Boolean): Boolean =
+        todoTaskDatabase.withWriteTransaction {
+            val previous = getVisibleTask(id)
+            if (previous == null) {
+                Log.w(TAG, "Rejected setComplete: task $id is missing or hidden")
+                return@withWriteTransaction false
+            }
+            saveEditIfChanged(previous, previous.copy(isComplete = isComplete))
+            true
+        }
+
+    /**
+     * Tombstones the task with [id] and queues the delete for upload. Deleting a top-level task
+     * also tombstones each of its subtasks that isn't already deleted, each with its own outbox
+     * row, so the server learns of every delete. Does nothing if the task is missing or already
+     * deleted.
+     */
+    suspend fun deleteTask(id: String) {
+        todoTaskDatabase.withWriteTransaction {
+            val task = tasksLocalDataSource.getTask(id)
+            if (task == null || task.deletedAt != null) return@withWriteTransaction
+
+            val subtasks = if (task.parentTaskId == null) {
+                tasksLocalDataSource.getSubtasks(id)
+            } else {
+                emptyList()
+            }
+            val now = clock.millis()
+            (listOf(task) + subtasks)
+                .filter { it.deletedAt == null }
+                .forEach { previous ->
+                    saveEdit(previous, previous.copy(deletedAt = now, lastUpdatedAt = now))
+                }
         }
     }
 
