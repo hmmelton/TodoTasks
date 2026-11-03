@@ -4,6 +4,7 @@ import androidx.room3.Room
 import androidx.sqlite.driver.AndroidSQLiteDriver
 import androidx.test.core.app.ApplicationProvider
 import com.harrison.todotasks.data.local.entities.TodoTaskEntity
+import com.harrison.todotasks.data.local.entities.TodoTaskUpdateEntity
 import com.harrison.todotasks.data.model.TodoTask
 
 /** Builds an in-memory database with the same driver as production. */
@@ -34,6 +35,18 @@ fun todoTaskEntity(
     parentTaskId = parentTaskId,
     isComplete = isComplete,
     version = null,
+)
+
+fun todoTaskUpdate(
+    taskId: String,
+    base: TodoTaskEntity? = null,
+    revision: Long = 1L,
+    failedAt: Long? = null,
+): TodoTaskUpdateEntity = TodoTaskUpdateEntity(
+    taskId = taskId,
+    base = base,
+    revision = revision,
+    failedAt = failedAt,
 )
 
 /** A task with a non-null value in every field. */
