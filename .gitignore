@@ -1,17 +1,20 @@
-*.iml
-.gradle
-.kotlin/
-/.idea/
-.DS_Store
+# Gradle build files & cache
+.gradle/
 build/
-/captures
-.externalNativeBuild
-.cxx
+.kotlin/
+
+# IDE settings
+.idea/
+*.iml
+/captures/
+.externalNativeBuild/
+.cxx/
+
+# Local configurations & Environment
 local.properties
-gradle/wrapper/
-gradle/gradle-daemon-jvm.properties
-*gradle.*
-gradlew*
+keystore.properties
+.DS_Store
+
+# Keystores and signing keys
 *.jks
 *.keystore
-keystore.properties
