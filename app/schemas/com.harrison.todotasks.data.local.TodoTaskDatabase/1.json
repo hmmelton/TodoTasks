@@ -1,0 +1,204 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 1,
+    "identityHash": "6e6ae30e423f5d979fa5c4dad03a68d6",
+    "entities": [
+      {
+        "tableName": "todo_tasks",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `title` TEXT NOT NULL, `description` TEXT NOT NULL, `created_at` INTEGER NOT NULL, `last_updated_at` INTEGER NOT NULL, `deleted_at` INTEGER, `due_at` INTEGER, `parent_task_id` TEXT, `is_complete` INTEGER NOT NULL, `version` INTEGER, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "title",
+            "columnName": "title",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "description",
+            "columnName": "description",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "created_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastUpdatedAt",
+            "columnName": "last_updated_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "deletedAt",
+            "columnName": "deleted_at",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "dueAt",
+            "columnName": "due_at",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "parentTaskId",
+            "columnName": "parent_task_id",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "isComplete",
+            "columnName": "is_complete",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "version",
+            "columnName": "version",
+            "affinity": "INTEGER"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_todo_tasks_parent_task_id",
+            "unique": false,
+            "columnNames": [
+              "parent_task_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_todo_tasks_parent_task_id` ON `${TABLE_NAME}` (`parent_task_id`)"
+          },
+          {
+            "name": "index_todo_tasks_deleted_at",
+            "unique": false,
+            "columnNames": [
+              "deleted_at"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_todo_tasks_deleted_at` ON `${TABLE_NAME}` (`deleted_at`)"
+          }
+        ]
+      },
+      {
+        "tableName": "todo_task_updates",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`task_id` TEXT NOT NULL, `revision` INTEGER NOT NULL, `failed_at` INTEGER, `base_id` TEXT, `base_title` TEXT, `base_description` TEXT, `base_created_at` INTEGER, `base_last_updated_at` INTEGER, `base_deleted_at` INTEGER, `base_due_at` INTEGER, `base_parent_task_id` TEXT, `base_is_complete` INTEGER, `base_version` INTEGER, PRIMARY KEY(`task_id`))",
+        "fields": [
+          {
+            "fieldPath": "taskId",
+            "columnName": "task_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "revision",
+            "columnName": "revision",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "failedAt",
+            "columnName": "failed_at",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "base.id",
+            "columnName": "base_id",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "base.title",
+            "columnName": "base_title",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "base.description",
+            "columnName": "base_description",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "base.createdAt",
+            "columnName": "base_created_at",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "base.lastUpdatedAt",
+            "columnName": "base_last_updated_at",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "base.deletedAt",
+            "columnName": "base_deleted_at",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "base.dueAt",
+            "columnName": "base_due_at",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "base.parentTaskId",
+            "columnName": "base_parent_task_id",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "base.isComplete",
+            "columnName": "base_is_complete",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "base.version",
+            "columnName": "base_version",
+            "affinity": "INTEGER"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "task_id"
+          ]
+        }
+      },
+      {
+        "tableName": "sync_state",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER NOT NULL, `cursor` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "cursor",
+            "columnName": "cursor",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        }
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '6e6ae30e423f5d979fa5c4dad03a68d6')"
+    ]
+  }
+}
