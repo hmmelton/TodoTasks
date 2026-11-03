@@ -66,17 +66,6 @@ class TodoTasksRepositoryDeleteTest : RepositoryTest() {
     }
 
     @Test
-    fun `cascade continues a subtask's pending row instead of replacing it`() = runTest {
-        val parentId = createTask(title = "Parent")
-        val childId = createTask(title = "Child", parentTaskId = parentId)
-        repository.setComplete(childId, isComplete = true)
-
-        repository.deleteTask(parentId)
-
-        assertEquals(todoTaskUpdate(childId, revision = 3L), sync.getTaskUpdate(childId))
-    }
-
-    @Test
     fun `deleting a subtask leaves its parent and siblings alone`() = runTest {
         val parent = syncedTask("parent")
         val sibling = syncedTask("sibling", parentTaskId = "parent")

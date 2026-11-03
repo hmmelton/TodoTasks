@@ -25,22 +25,6 @@ class TodoTasksRepositoryReadsTest : RepositoryTest() {
     }
 
     @Test
-    fun `subtasks show created subtasks and empty when the parent is deleted`() = runTest {
-        val parentId = createTask(title = "Parent")
-
-        repository.observeSubtasks(parentId).test {
-            assertTrue(awaitItem().isEmpty())
-
-            val childId = createTask(title = "Child", parentTaskId = parentId)
-            assertEquals(listOf(childId), awaitItem().map { it.id })
-
-            repository.deleteTask(parentId)
-            assertTrue(awaitItem().isEmpty())
-            cancelAndIgnoreRemainingEvents()
-        }
-    }
-
-    @Test
     fun `observed task reflects each edit and emits null once deleted`() = runTest {
         val id = createTask(title = "Old")
 

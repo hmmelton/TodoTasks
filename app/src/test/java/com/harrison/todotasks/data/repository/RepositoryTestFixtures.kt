@@ -76,8 +76,7 @@ abstract class RepositoryTest {
         title: String,
         description: String = "",
         dueAt: Long? = null,
-        parentTaskId: String? = null,
-    ): String = checkNotNull(repository.createTask(title, description, dueAt, parentTaskId)) {
+    ): String = checkNotNull(repository.createTask(title, description, dueAt)) {
         "createTask(\"$title\") was rejected"
     }
 

@@ -43,43 +43,20 @@ class TodoTasksRepository @Inject constructor(
     /** Observes visible tasks that have no parent, in display order. */
     fun observeTopLevelTasks(): Flow<List<TodoTask>> = tasksLocalDataSource.observeTopLevelTasks()
 
-    /** Observes the visible subtasks of [parentId], in display order. */
-    fun observeSubtasks(parentId: String): Flow<List<TodoTask>> =
-        tasksLocalDataSource.observeSubtasks(parentId)
-
     /** Observes the task with [id], emitting null if it does not exist or is not visible. */
     fun observeTask(id: String): Flow<TodoTask?> = tasksLocalDataSource.observeTask(id)
 
     /**
      * Creates an incomplete task and queues it for upload.
      *
-     * @param parentTaskId The parent of a subtask, or null for a top-level task. Subtasks are one
-     * level deep.
-     * @return The ID of the new task, or null if it was rejected because [title] is blank or
-     * [parentTaskId] is not a visible top-level task.
+     * @return The ID of the new task, or null if it was rejected because [title] is blank.
      */
-    suspend fun createTask(
-        title: String,
-        description: String = "",
-        dueAt: Long? = null,
-        parentTaskId: String? = null,
-    ): String? {
+    suspend fun createTask(title: String, description: String = "", dueAt: Long? = null): String? {
         if (title.isBlank()) {
             Log.w(TAG, "Rejected createTask: blank title")
             return null
         }
         return todoTaskDatabase.withWriteTransaction {
-            if (parentTaskId != null) {
-                val parent = getVisibleTask(parentTaskId)
-                if (parent == null) {
-                    Log.w(TAG, "Rejected createTask: parent $parentTaskId is missing or hidden")
-                    return@withWriteTransaction null
-                }
-                if (parent.parentTaskId != null) {
-                    Log.w(TAG, "Rejected createTask: parent $parentTaskId is a subtask")
-                    return@withWriteTransaction null
-                }
-            }
             val now = clock.millis()
             val task = TodoTask(
                 id = UUID.randomUUID().toString(),
@@ -89,7 +66,7 @@ class TodoTasksRepository @Inject constructor(
                 lastUpdatedAt = now,
                 deletedAt = null,
                 dueAt = dueAt,
-                parentTaskId = parentTaskId,
+                parentTaskId = null,
                 isComplete = false,
                 version = null,
             )

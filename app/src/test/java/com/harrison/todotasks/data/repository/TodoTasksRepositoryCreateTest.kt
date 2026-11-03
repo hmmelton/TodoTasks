@@ -53,47 +53,8 @@ class TodoTasksRepositoryCreateTest : RepositoryTest() {
     }
 
     @Test
-    fun `create under a top-level parent writes a subtask and leaves the parent alone`() =
-        runTest {
-            val parent = syncedTask("parent")
-            seed(parent)
-
-            val id = createTask(title = "Child", parentTaskId = "parent")
-
-            assertEquals("parent", tasks.getTask(id)?.parentTaskId)
-            assertEquals(todoTaskUpdate(id), sync.getTaskUpdate(id))
-            assertEquals(parent, tasks.getTask("parent"))
-            assertEquals(null, sync.getTaskUpdate("parent"))
-        }
-
-    @Test
     fun `create with a blank title is rejected and writes nothing`() = runTest {
         assertWritesNothing { assertNull(repository.createTask(title = "")) }
         assertWritesNothing { assertNull(repository.createTask(title = "  \t")) }
-    }
-
-    @Test
-    fun `create under a missing parent is rejected and writes nothing`() = runTest {
-        assertWritesNothing {
-            assertNull(repository.createTask(title = "Child", parentTaskId = "missing"))
-        }
-    }
-
-    @Test
-    fun `create under a deleted parent is rejected and writes nothing`() = runTest {
-        seed(syncedTask("parent", deletedAt = 50L))
-
-        assertWritesNothing("parent") {
-            assertNull(repository.createTask(title = "Child", parentTaskId = "parent"))
-        }
-    }
-
-    @Test
-    fun `create under a subtask is rejected, because subtasks are one level deep`() = runTest {
-        seed(syncedTask("parent"), syncedTask("child", parentTaskId = "parent"))
-
-        assertWritesNothing("parent", "child") {
-            assertNull(repository.createTask(title = "Grandchild", parentTaskId = "child"))
-        }
     }
 }
