@@ -47,6 +47,13 @@ interface TodoTaskDao {
     @Query("SELECT * FROM todo_tasks WHERE id = :id")
     suspend fun getTask(id: String): TodoTaskEntity?
 
+    /**
+     * Returns every subtask of [parentId], in no particular order. Hidden subtasks are included,
+     * so a delete can reach all of them.
+     */
+    @Query("SELECT * FROM todo_tasks WHERE parent_task_id = :parentId")
+    suspend fun getSubtasks(parentId: String): List<TodoTaskEntity>
+
     /** Inserts [task], or replaces the row with the same ID. */
     @Upsert
     suspend fun upsert(task: TodoTaskEntity)
