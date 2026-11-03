@@ -9,6 +9,11 @@ import com.harrison.todotasks.data.local.TodoTasksLocalDataSource
 import com.harrison.todotasks.data.local.inMemoryTodoTaskDatabase
 import com.harrison.todotasks.data.local.sparseTask
 import com.harrison.todotasks.data.model.TodoTask
+import com.harrison.todotasks.data.network.MockServer
+import com.harrison.todotasks.data.sync.ConflictResolver
+import io.ktor.client.engine.mock.MockRequestHandleScope
+import io.ktor.client.request.HttpRequestData
+import io.ktor.client.request.HttpResponseData
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneId
@@ -29,7 +34,8 @@ class MutableClock(var nowMillis: Long = 1_000L) : Clock() {
 
 /**
  * Builds a [TodoTasksRepository] over a real in-memory database and real data sources, with a
- * clock the test controls. Tests seed and inspect storage through [tasks] and [sync].
+ * clock the test controls and a [server] that answers with [respond]. Tests seed and inspect
+ * storage through [tasks] and [sync].
  */
 @RunWith(RobolectricTestRunner::class)
 abstract class RepositoryTest {
@@ -39,6 +45,13 @@ abstract class RepositoryTest {
     protected lateinit var tasks: TodoTasksLocalDataSource
     protected lateinit var sync: TodoTaskSyncLocalDataSource
     protected lateinit var repository: TodoTasksRepository
+
+    /** Answers each request the repository sends. By default, any request fails the test. */
+    protected var respond: suspend MockRequestHandleScope.(HttpRequestData) -> HttpResponseData =
+        { request -> throw AssertionError("Unexpected request: ${request.url}") }
+
+    /** The sync server, which records each request and answers it with [respond]. */
+    protected val server = MockServer { request -> respond(request) }
 
     @Before
     fun setUpRepository() {
@@ -51,6 +64,8 @@ abstract class RepositoryTest {
         repository = TodoTasksRepository(
             tasksLocalDataSource = tasks,
             syncLocalDataSource = sync,
+            tasksNetworkDataSource = server.dataSource,
+            conflictResolver = ConflictResolver(),
             todoTaskDatabase = todoTaskDatabase,
             clock = clock,
         )
