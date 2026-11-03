@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 1,
-    "identityHash": "c1b8ef01f1b5115231b3cc84ca1d40a5",
+    "identityHash": "aaa6d269fd54237e0fdbe17cb121b9d2",
     "entities": [
       {
         "tableName": "todo_tasks",
@@ -91,11 +91,90 @@
             "createSql": "CREATE INDEX IF NOT EXISTS `index_todo_tasks_deleted_at` ON `${TABLE_NAME}` (`deleted_at`)"
           }
         ]
+      },
+      {
+        "tableName": "todo_task_updates",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`task_id` TEXT NOT NULL, `revision` INTEGER NOT NULL, `failed_at` INTEGER, `base_id` TEXT, `base_title` TEXT, `base_description` TEXT, `base_created_at` INTEGER, `base_last_updated_at` INTEGER, `base_deleted_at` INTEGER, `base_due_at` INTEGER, `base_parent_task_id` TEXT, `base_is_complete` INTEGER, `base_version` INTEGER, PRIMARY KEY(`task_id`))",
+        "fields": [
+          {
+            "fieldPath": "taskId",
+            "columnName": "task_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "revision",
+            "columnName": "revision",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "failedAt",
+            "columnName": "failed_at",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "base.id",
+            "columnName": "base_id",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "base.title",
+            "columnName": "base_title",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "base.description",
+            "columnName": "base_description",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "base.createdAt",
+            "columnName": "base_created_at",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "base.lastUpdatedAt",
+            "columnName": "base_last_updated_at",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "base.deletedAt",
+            "columnName": "base_deleted_at",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "base.dueAt",
+            "columnName": "base_due_at",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "base.parentTaskId",
+            "columnName": "base_parent_task_id",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "base.isComplete",
+            "columnName": "base_is_complete",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "base.version",
+            "columnName": "base_version",
+            "affinity": "INTEGER"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "task_id"
+          ]
+        }
       }
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'c1b8ef01f1b5115231b3cc84ca1d40a5')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'aaa6d269fd54237e0fdbe17cb121b9d2')"
     ]
   }
 }
