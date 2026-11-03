@@ -65,7 +65,6 @@ class TodoTasksRepository @Inject constructor(
                 lastUpdatedAt = now,
                 deletedAt = null,
                 dueAt = dueAt,
-                parentTaskId = null,
                 isComplete = false,
                 version = null,
             )

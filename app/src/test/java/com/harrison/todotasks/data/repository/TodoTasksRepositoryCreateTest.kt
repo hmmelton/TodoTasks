@@ -25,7 +25,6 @@ class TodoTasksRepositoryCreateTest : RepositoryTest() {
                 lastUpdatedAt = 5_000L,
                 deletedAt = null,
                 dueAt = null,
-                parentTaskId = null,
                 isComplete = false,
                 version = null,
             ),

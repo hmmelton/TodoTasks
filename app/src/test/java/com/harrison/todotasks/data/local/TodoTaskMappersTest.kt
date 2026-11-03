@@ -28,7 +28,6 @@ class TodoTaskMappersTest {
         assertEquals(fullTask.lastUpdatedAt, entity.lastUpdatedAt)
         assertEquals(fullTask.deletedAt, entity.deletedAt)
         assertEquals(fullTask.dueAt, entity.dueAt)
-        assertEquals(fullTask.parentTaskId, entity.parentTaskId)
         assertEquals(fullTask.isComplete, entity.isComplete)
         assertEquals(fullTask.version, entity.version)
     }

@@ -18,7 +18,6 @@ class ConflictResolverTest {
         lastUpdatedAt = 2_000L,
         deletedAt = null,
         dueAt = 5_000L,
-        parentTaskId = "parent-id",
         isComplete = false,
         version = 1L,
     )
@@ -356,24 +355,13 @@ class ConflictResolverTest {
 
     @Test
     fun `identity fields come from remote`() {
-        val local = base.copy(
-            id = "local-id",
-            createdAt = 1_100L,
-            parentTaskId = "local-parent-id",
-            lastUpdatedAt = LATER,
-        )
-        val remote = base.copy(
-            id = "remote-id",
-            createdAt = 1_200L,
-            parentTaskId = "remote-parent-id",
-            lastUpdatedAt = EARLIER,
-        )
+        val local = base.copy(id = "local-id", createdAt = 1_100L, lastUpdatedAt = LATER)
+        val remote = base.copy(id = "remote-id", createdAt = 1_200L, lastUpdatedAt = EARLIER)
 
         val result = resolver.resolve(base, local, remote)
 
         assertEquals("remote-id", result.id)
         assertEquals(1_200L, result.createdAt)
-        assertEquals("remote-parent-id", result.parentTaskId)
     }
 
     private companion object {
