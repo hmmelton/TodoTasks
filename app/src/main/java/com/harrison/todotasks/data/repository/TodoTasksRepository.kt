@@ -14,6 +14,8 @@ import com.harrison.todotasks.data.model.TodoTask
 import com.harrison.todotasks.data.network.TodoTasksNetworkDataSource
 import com.harrison.todotasks.data.network.UploadResult
 import com.harrison.todotasks.data.sync.ConflictResolver
+import com.harrison.todotasks.data.sync.SyncScheduler
+import com.harrison.todotasks.data.sync.SyncWorker
 import io.ktor.client.plugins.ResponseException
 import io.ktor.serialization.JsonConvertException
 import java.io.IOException
@@ -40,11 +42,14 @@ private const val TAG = "TodoTasksRepository"
  *
  * Only tasks that are not deleted can be edited, because they are the only ones the UI can show.
  *
+ * Each write that saves something requests a sync from [SyncScheduler] once its transaction has
+ * committed, so the sync can never start before the change it uploads is stored.
+ *
  * Sync uploads the outbox later with [uploadPendingChanges] and downloads the server's changes
- * with [downloadChanges], and WorkManager decides when to run them and when to retry. Network
- * calls are never made inside a database transaction, so local writes are never blocked on the
- * network. Instead, each outbox row's revision is checked after the call, so an edit made during
- * an upload is never lost.
+ * with [downloadChanges]. [SyncWorker] runs them, and WorkManager decides when to run it and when
+ * to retry. Network calls are never made inside a database transaction, so local writes are never
+ * blocked on the network. Instead, each outbox row's revision is checked after the call, so an
+ * edit made during an upload is never lost.
  */
 @Singleton
 class TodoTasksRepository @Inject constructor(
@@ -54,6 +59,7 @@ class TodoTasksRepository @Inject constructor(
     private val conflictResolver: ConflictResolver,
     private val todoTaskDatabase: TodoTaskDatabase,
     private val clock: Clock,
+    private val syncScheduler: SyncScheduler,
 ) {
 
     /** Observes the tasks that are not deleted, in display order. */
@@ -73,7 +79,7 @@ class TodoTasksRepository @Inject constructor(
             Log.w(TAG, "Rejected createTask: blank title")
             return null
         }
-        return todoTaskDatabase.withWriteTransaction {
+        val id = todoTaskDatabase.withWriteTransaction {
             val now = clock.millis()
             val task = TodoTask(
                 id = UUID.randomUUID().toString(),
@@ -89,6 +95,8 @@ class TodoTasksRepository @Inject constructor(
             saveEdit(previous = null, edited = task)
             task.id
         }
+        syncScheduler.requestSync()
+        return id
     }
 
     /**
@@ -104,18 +112,18 @@ class TodoTasksRepository @Inject constructor(
             Log.w(TAG, "Rejected updateTask: blank title")
             return false
         }
-        return todoTaskDatabase.withWriteTransaction {
+        val result = todoTaskDatabase.withWriteTransaction {
             val previous = getLiveTask(id)
             if (previous == null) {
                 Log.w(TAG, "Rejected updateTask: task $id is missing or deleted")
-                return@withWriteTransaction false
+                return@withWriteTransaction EditResult.Rejected
             }
             saveEditIfChanged(
                 previous,
                 previous.copy(title = title, description = description, dueAt = dueAt),
             )
-            true
         }
+        return requestSyncIfSaved(result)
     }
 
     /**
@@ -126,16 +134,17 @@ class TodoTasksRepository @Inject constructor(
      * because the task is missing or deleted.
      * @throws SQLiteException if the database write fails. Nothing is written.
      */
-    suspend fun setComplete(id: String, isComplete: Boolean): Boolean =
-        todoTaskDatabase.withWriteTransaction {
+    suspend fun setComplete(id: String, isComplete: Boolean): Boolean {
+        val result = todoTaskDatabase.withWriteTransaction {
             val previous = getLiveTask(id)
             if (previous == null) {
                 Log.w(TAG, "Rejected setComplete: task $id is missing or deleted")
-                return@withWriteTransaction false
+                return@withWriteTransaction EditResult.Rejected
             }
             saveEditIfChanged(previous, previous.copy(isComplete = isComplete))
-            true
         }
+        return requestSyncIfSaved(result)
+    }
 
     /**
      * Tombstones the task with [id] and queues the delete for upload. Does nothing if the task is
@@ -144,11 +153,13 @@ class TodoTasksRepository @Inject constructor(
      * @throws SQLiteException if the database write fails. Nothing is written.
      */
     suspend fun deleteTask(id: String) {
-        todoTaskDatabase.withWriteTransaction {
-            val previous = getLiveTask(id) ?: return@withWriteTransaction
+        val deleted = todoTaskDatabase.withWriteTransaction {
+            val previous = getLiveTask(id) ?: return@withWriteTransaction false
             val now = clock.millis()
             saveEdit(previous, previous.copy(deletedAt = now, lastUpdatedAt = now))
+            true
         }
+        if (deleted) syncScheduler.requestSync()
     }
 
     /**
@@ -168,7 +179,7 @@ class TodoTasksRepository @Inject constructor(
      *
      * Any other failure stops the upload. Rows already uploaded stay uploaded, and the rest stay
      * pending, so calling this again later picks up where it stopped. This never retries an
-     * upload itself; the caller schedules the next attempt.
+     * upload itself; [SyncWorker] schedules the next attempt.
      *
      * @return True if no rows are left pending, or false if some still need uploading, such as a
      * merge after a conflict or an edit made during this sync, so the caller should sync again.
@@ -198,7 +209,7 @@ class TodoTasksRepository @Inject constructor(
      *
      * The download is made outside any transaction. The tasks and the new cursor are then saved in
      * one transaction, so a crash never skips a download or saves only part of one. This never
-     * retries a download itself; the caller schedules the next attempt.
+     * retries a download itself; [SyncWorker] schedules the next attempt.
      *
      * @throws IOException if the server can't be reached.
      * @throws ResponseException if the server responds with a non-2xx status.
@@ -330,9 +341,25 @@ class TodoTasksRepository @Inject constructor(
     private suspend fun getLiveTask(id: String): TodoTask? =
         tasksLocalDataSource.getTask(id)?.takeIf { it.deletedAt == null }
 
-    /** Saves [edited] with a new `lastUpdatedAt`, unless it is the same as [previous]. */
-    private suspend fun saveEditIfChanged(previous: TodoTask, edited: TodoTask) {
-        if (edited != previous) saveEdit(previous, edited.copy(lastUpdatedAt = clock.millis()))
+    /**
+     * Saves [edited] with a new `lastUpdatedAt`, unless it is the same as [previous].
+     *
+     * @return [EditResult.Saved], or [EditResult.Unchanged] if nothing was written.
+     */
+    private suspend fun saveEditIfChanged(previous: TodoTask, edited: TodoTask): EditResult {
+        if (edited == previous) return EditResult.Unchanged
+        saveEdit(previous, edited.copy(lastUpdatedAt = clock.millis()))
+        return EditResult.Saved
+    }
+
+    /**
+     * Requests a sync if an edit's committed transaction saved something.
+     *
+     * @return False if the edit was rejected, or true otherwise.
+     */
+    private fun requestSyncIfSaved(result: EditResult): Boolean {
+        if (result == EditResult.Saved) syncScheduler.requestSync()
+        return result != EditResult.Rejected
     }
 
     /**
@@ -360,4 +387,16 @@ class TodoTasksRepository @Inject constructor(
                 ),
         )
     }
+}
+
+/** The outcome of an edit to an existing task. */
+private enum class EditResult {
+    /** The edit was written and queued for upload. */
+    Saved,
+
+    /** The edit would change nothing, so nothing was written. */
+    Unchanged,
+
+    /** The task is missing or deleted, so nothing was written. */
+    Rejected,
 }

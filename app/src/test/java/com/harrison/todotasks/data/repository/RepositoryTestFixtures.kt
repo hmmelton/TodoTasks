@@ -11,9 +11,11 @@ import com.harrison.todotasks.data.local.sparseTask
 import com.harrison.todotasks.data.model.TodoTask
 import com.harrison.todotasks.data.network.MockServer
 import com.harrison.todotasks.data.sync.ConflictResolver
+import com.harrison.todotasks.data.sync.SyncScheduler
 import io.ktor.client.engine.mock.MockRequestHandleScope
 import io.ktor.client.request.HttpRequestData
 import io.ktor.client.request.HttpResponseData
+import io.mockk.mockk
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneId
@@ -34,13 +36,14 @@ class MutableClock(var nowMillis: Long = 1_000L) : Clock() {
 
 /**
  * Builds a [TodoTasksRepository] over a real in-memory database and real data sources, with a
- * clock the test controls and a [server] that answers with [respond]. Tests seed and inspect
- * storage through [tasks] and [sync].
+ * clock the test controls, a [server] that answers with [respond], and a mock [syncScheduler] that
+ * records the syncs requested. Tests seed and inspect storage through [tasks] and [sync].
  */
 @RunWith(RobolectricTestRunner::class)
 abstract class RepositoryTest {
 
     protected val clock = MutableClock()
+    protected val syncScheduler = mockk<SyncScheduler>(relaxUnitFun = true)
     protected lateinit var todoTaskDatabase: TodoTaskDatabase
     protected lateinit var tasks: TodoTasksLocalDataSource
     protected lateinit var sync: TodoTaskSyncLocalDataSource
@@ -68,6 +71,7 @@ abstract class RepositoryTest {
             conflictResolver = ConflictResolver(),
             todoTaskDatabase = todoTaskDatabase,
             clock = clock,
+            syncScheduler = syncScheduler,
         )
     }
 
