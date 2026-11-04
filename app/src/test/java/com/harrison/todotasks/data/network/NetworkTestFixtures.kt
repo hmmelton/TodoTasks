@@ -3,6 +3,7 @@ package com.harrison.todotasks.data.network
 import com.harrison.todotasks.data.di.NetworkModule
 import com.harrison.todotasks.data.model.TodoTask
 import com.harrison.todotasks.data.network.model.NetworkTodoTask
+import com.harrison.todotasks.data.network.model.NetworkTodoTaskChanges
 import com.harrison.todotasks.data.network.model.asNetworkTodoTask
 import com.harrison.todotasks.data.network.model.asTodoTask
 import io.ktor.client.engine.mock.MockEngine
@@ -58,6 +59,15 @@ fun MockRequestHandleScope.respondTask(
     status: HttpStatusCode = HttpStatusCode.OK,
 ): HttpResponseData =
     respondJson(Json.encodeToString(NetworkTodoTask.serializer(), task.asNetworkTodoTask()), status)
+
+/** Responds with [tasks] and [cursor] as the server's JSON body for a download. */
+fun MockRequestHandleScope.respondChanges(tasks: List<TodoTask>, cursor: Long): HttpResponseData =
+    respondJson(
+        Json.encodeToString(
+            NetworkTodoTaskChanges.serializer(),
+            NetworkTodoTaskChanges(tasks = tasks.map { it.asNetworkTodoTask() }, cursor = cursor),
+        ),
+    )
 
 /** Returns the task this request uploaded as its JSON body. */
 suspend fun HttpRequestData.sentTask(): TodoTask =
