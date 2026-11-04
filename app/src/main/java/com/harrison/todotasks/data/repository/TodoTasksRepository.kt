@@ -40,10 +40,11 @@ private const val TAG = "TodoTasksRepository"
  *
  * Only tasks that are not deleted can be edited, because they are the only ones the UI can show.
  *
- * Sync uploads the outbox later with [uploadPendingChanges], and WorkManager decides when to run
- * it and when to retry. Network calls are never made inside a
- * database transaction, so local writes are never blocked on the network. Instead, each outbox
- * row's revision is checked after the call, so an edit made during an upload is never lost.
+ * Sync uploads the outbox later with [uploadPendingChanges] and downloads the server's changes
+ * with [downloadChanges], and WorkManager decides when to run them and when to retry. Network
+ * calls are never made inside a database transaction, so local writes are never blocked on the
+ * network. Instead, each outbox row's revision is checked after the call, so an edit made during
+ * an upload is never lost.
  */
 @Singleton
 class TodoTasksRepository @Inject constructor(
@@ -184,6 +185,37 @@ class TodoTasksRepository @Inject constructor(
         return syncLocalDataSource.getPendingTaskUpdates().isEmpty()
     }
 
+    /**
+     * Downloads every task that changed on the server since the stored cursor, and saves them.
+     *
+     * Each downloaded task is saved according to its outbox row:
+     * - No row: nothing local is pending, so the server's task replaces the local one.
+     * - A row, pending or failed, and the local task has the server's version: the local edit is
+     *   already based on the server's task, such as an accepted upload echoed back, so it is kept.
+     * - A row, and the versions differ: the local task is merged with the server's using
+     *   [ConflictResolver], as after an upload conflict. If the row is pending, the merge is
+     *   uploaded by the next [uploadPendingChanges].
+     *
+     * The download is made outside any transaction. The tasks and the new cursor are then saved in
+     * one transaction, so a crash never skips a download or saves only part of one. This never
+     * retries a download itself; the caller schedules the next attempt.
+     *
+     * @throws IOException if the server can't be reached.
+     * @throws ResponseException if the server responds with a non-2xx status.
+     * @throws JsonConvertException if the response body isn't the expected JSON.
+     * @throws SQLiteException if the database write fails. Nothing is written, and the cursor is
+     * unchanged.
+     */
+    suspend fun downloadChanges() {
+        val changes = tasksNetworkDataSource.getTasksSince(syncLocalDataSource.getCursor())
+        todoTaskDatabase.withWriteTransaction {
+            for (remote in changes.tasks) {
+                saveDownloadedTask(remote)
+            }
+            syncLocalDataSource.setCursor(changes.cursor)
+        }
+    }
+
     /** Uploads the outbox row for [taskId] once, and saves the outcome. */
     private suspend fun uploadTaskUpdate(taskId: String) {
         // Read both together, so the task is exactly the copy at the row's revision.
@@ -238,28 +270,52 @@ class TodoTasksRepository @Inject constructor(
 
     /**
      * Merges the local task with [remote], the server's copy after a conflict, and saves the
-     * merge, which carries the server's version.
-     *
-     * The row's base is the common ancestor. A row with no base is a task that was never synced,
-     * but the server already has it, such as when an earlier upload's response was lost. Then
-     * [remote] stands in for the base, so every local field that differs from it wins.
-     *
-     * If the merge is [remote], nothing is left to upload and the row is deleted. Otherwise
-     * [remote] becomes the row's base, and the row stays pending so the merge is uploaded next.
+     * merge. See [mergeIntoQueuedTask].
      */
     private suspend fun saveMergedConflict(remote: TodoTask) {
         todoTaskDatabase.withWriteTransaction {
             val update = checkNotNull(syncLocalDataSource.getTaskUpdate(remote.id)) {
                 "Task ${remote.id} has no outbox row"
             }
-            val base = update.base?.asTodoTask() ?: remote
-            val merged = conflictResolver.resolve(base, getQueuedTask(remote.id), remote)
-            tasksLocalDataSource.upsertTask(merged)
-            if (merged == remote) {
-                syncLocalDataSource.deleteTaskUpdateIfRevisionMatches(remote.id, update.revision)
-            } else {
-                syncLocalDataSource.upsertTaskUpdate(update.copy(base = remote.asEntity()))
-            }
+            mergeIntoQueuedTask(update, remote)
+        }
+    }
+
+    /**
+     * Saves [remote], a downloaded task, as described in [downloadChanges]. Must run inside a
+     * write transaction.
+     */
+    private suspend fun saveDownloadedTask(remote: TodoTask) {
+        val update = syncLocalDataSource.getTaskUpdate(remote.id)
+        when {
+            update == null -> tasksLocalDataSource.upsertTask(remote)
+            // The server has nothing the local edit isn't already based on.
+            getQueuedTask(remote.id).version == remote.version -> Unit
+            else -> mergeIntoQueuedTask(update, remote)
+        }
+    }
+
+    /**
+     * Merges the local task, which has the outbox row [update], with [remote], the server's newer
+     * copy, and saves the merge, which carries the server's version. Must run inside a write
+     * transaction.
+     *
+     * The row's base is the common ancestor. A row with no base is a task that was never synced,
+     * but the server already has it, such as when an earlier upload's response was lost. Then
+     * [remote] stands in for the base, so every local field that differs from it wins.
+     *
+     * If the merge is [remote], nothing is left to upload and the row is deleted. Otherwise
+     * [remote] becomes the row's base, and the row keeps its revision and failure, so a pending row
+     * uploads the merge next.
+     */
+    private suspend fun mergeIntoQueuedTask(update: TodoTaskUpdateEntity, remote: TodoTask) {
+        val base = update.base?.asTodoTask() ?: remote
+        val merged = conflictResolver.resolve(base, getQueuedTask(remote.id), remote)
+        tasksLocalDataSource.upsertTask(merged)
+        if (merged == remote) {
+            syncLocalDataSource.deleteTaskUpdateIfRevisionMatches(remote.id, update.revision)
+        } else {
+            syncLocalDataSource.upsertTaskUpdate(update.copy(base = remote.asEntity()))
         }
     }
 
