@@ -2,6 +2,7 @@ package com.harrison.todotasks.ui.tasks
 
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
+import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.hasProgressBarRangeInfo
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -119,6 +120,68 @@ class TaskListContentTest {
         composeRule.onNodeWithText("Renew passport").performClick()
 
         assertEquals(listOf("done"), taskClicks)
+    }
+
+    @Test
+    fun `completed tasks are listed under their own heading`() {
+        setContent(TaskListUiState.Content(tasks = listOf(openTask, doneTask)))
+
+        val open = composeRule.onNodeWithText("Buy groceries").getBoundsInRoot()
+        val heading = composeRule.onNodeWithText("Completed").getBoundsInRoot()
+        val done = composeRule.onNodeWithText("Renew passport").getBoundsInRoot()
+        assertTrue(open.bottom <= heading.top)
+        assertTrue(heading.bottom <= done.top)
+    }
+
+    @Test
+    fun `there's no completed heading without completed tasks`() {
+        setContent(TaskListUiState.Content(tasks = listOf(openTask)))
+
+        composeRule.onNodeWithText("Completed").assertDoesNotExist()
+    }
+
+    @Test
+    fun `an incomplete task due before today is overdue`() {
+        val pastDue = midnightUtc(today.minusDays(2))
+        setContent(
+            TaskListUiState.Content(
+                tasks = listOf(
+                    openTask.copy(dueAt = pastDue),
+                    doneTask.copy(dueAt = pastDue),
+                ),
+            ),
+        )
+
+        composeRule.onNodeWithText("Overdue · Nov 2, 2026").assertExists()
+        composeRule.onNodeWithContentDescription("Overdue, due Nov 2, 2026").assertExists()
+        // A completed task isn't overdue.
+        composeRule.onNodeWithContentDescription("Due Nov 2, 2026").assertExists()
+    }
+
+    @Test
+    fun `tasks due today or tomorrow say so`() {
+        setContent(
+            TaskListUiState.Content(
+                tasks = listOf(
+                    openTask.copy(dueAt = midnightUtc(today)),
+                    doneTask.copy(dueAt = midnightUtc(today.plusDays(1)), isComplete = false),
+                ),
+            ),
+        )
+
+        composeRule.onNodeWithText("Today").assertExists()
+        composeRule.onNodeWithContentDescription("Due Today").assertExists()
+        composeRule.onNodeWithText("Tomorrow").assertExists()
+        composeRule.onNodeWithContentDescription("Due Tomorrow").assertExists()
+    }
+
+    @Test
+    fun `tapping a due date opens its task`() {
+        setContent(TaskListUiState.Content(tasks = listOf(openTask)))
+
+        composeRule.onNodeWithText("Nov 24, 2026").performClick()
+
+        assertEquals(listOf("open"), taskClicks)
     }
 
     @Test
