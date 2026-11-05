@@ -101,6 +101,8 @@ dependencies {
     testImplementation(libs.androidx.test.core)
     testImplementation(libs.ktor.client.mock)
     testImplementation(libs.mockk)
+    testImplementation(platform(libs.androidx.compose.bom))
+    testImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))
