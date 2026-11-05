@@ -18,4 +18,26 @@
     <string name="due_date_today">Today</string>
     <string name="due_date_tomorrow">Tomorrow</string>
 
+    <!-- Add and edit task -->
+    <string name="edit_task_new_title">New task</string>
+    <string name="edit_task_edit_title">Edit task</string>
+    <string name="edit_task_back">Navigate up</string>
+    <string name="edit_task_save">Save</string>
+    <string name="edit_task_delete">Delete task</string>
+    <string name="edit_task_title_label">Title</string>
+    <string name="edit_task_description_label">Description</string>
+    <string name="edit_task_due_date">Due date</string>
+    <string name="edit_task_no_due_date">None</string>
+    <string name="edit_task_pick_due_date">Pick date…</string>
+    <string name="edit_task_clear_due_date">Clear due date</string>
+    <string name="edit_task_date_picker_confirm">OK</string>
+    <string name="edit_task_cancel">Cancel</string>
+    <string name="edit_task_delete_dialog_title">Delete this task?</string>
+    <string name="edit_task_delete_dialog_text">It will be removed from all your devices.</string>
+    <string name="edit_task_delete_dialog_confirm">Delete</string>
+    <string name="edit_task_not_found">This task no longer exists.</string>
+    <string name="edit_task_error">This task couldn\'t be loaded.</string>
+    <string name="edit_task_back_to_tasks">Back to tasks</string>
+    <string name="edit_task_save_failed">Couldn\'t save the task. Try again.</string>
+    <string name="edit_task_delete_failed">Couldn\'t delete the task. Try again.</string>
 </resources>
