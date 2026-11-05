@@ -54,6 +54,8 @@ android {
 
 composeCompiler {
     stabilityConfigurationFiles.add(layout.projectDirectory.file("compose_stability.conf"))
+    reportsDestination = layout.buildDirectory.dir("compose_metrics")
+    metricsDestination = layout.buildDirectory.dir("compose_metrics")
 }
 
 room3 {
