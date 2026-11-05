@@ -1,3 +1,21 @@
 <resources>
     <string name="app_name">TodoTasks</string>
+
+    <!-- Task list -->
+    <string name="task_list_title">Tasks</string>
+    <string name="task_list_add">New task</string>
+    <string name="task_list_empty">No tasks yet. Tap + to add one.</string>
+    <string name="task_list_error">Your tasks couldn\'t be loaded.</string>
+    <string name="task_list_edit_label">edit task</string>
+    <string name="task_list_complete">Complete %1$s</string>
+    <string name="task_list_due">Due %1$s</string>
+    <string name="task_list_overdue">Overdue, due %1$s</string>
+    <string name="task_list_overdue_label">Overdue · %1$s</string>
+    <string name="task_list_completed">Completed</string>
+    <string name="task_list_complete_change_failed">Couldn\'t update the task. Try again.</string>
+
+    <!-- Due dates -->
+    <string name="due_date_today">Today</string>
+    <string name="due_date_tomorrow">Tomorrow</string>
+
 </resources>
