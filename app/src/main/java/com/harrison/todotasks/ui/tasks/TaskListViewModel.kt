@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.sqlite.SQLiteException
 import com.harrison.todotasks.data.repository.TodoTasksRepository
+import com.harrison.todotasks.data.sync.SyncScheduler
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -19,22 +20,30 @@ private const val TAG = "TaskListViewModel"
 
 /**
  * Holds the state of the task list screen, which shows every task that isn't deleted and lets
- * the user complete tasks.
+ * the user complete tasks and sync them on demand.
  *
  * The list is read from [TodoTasksRepository], so it updates as tasks are edited locally or
- * synced. A failed read replaces the list with [TaskListUiState.Error]. A failed write keeps the
- * list and shows [TaskListMessage.CompleteChangeFailed].
+ * synced. Syncs are requested from, and observed on, [SyncScheduler] directly, because the
+ * repository would only pass the calls through. A failed read replaces the list with
+ * [TaskListUiState.Error]. A failed write keeps the list and shows
+ * [TaskListMessage.CompleteChangeFailed].
  */
 @HiltViewModel
 class TaskListViewModel @Inject constructor(
     private val repository: TodoTasksRepository,
+    private val syncScheduler: SyncScheduler,
 ) : ViewModel() {
 
     private val message = MutableStateFlow<TaskListMessage?>(null)
 
     /** The state of the screen, which starts as [TaskListUiState.Loading]. */
     val uiState: StateFlow<TaskListUiState> =
-        combine<_, _, TaskListUiState>(repository.observeTasks(), message, TaskListUiState::Content)
+        combine<_, _, _, TaskListUiState>(
+            repository.observeTasks(),
+            message,
+            syncScheduler.isSyncing,
+            TaskListUiState::Content,
+        )
             .catch { e ->
                 Log.e(TAG, "Failed to read tasks", e)
                 emit(TaskListUiState.Error)
@@ -58,6 +67,14 @@ class TaskListViewModel @Inject constructor(
                 message.value = TaskListMessage.CompleteChangeFailed
             }
         }
+    }
+
+    /**
+     * Syncs tasks with the server now, such as when the user pulls to refresh. Does nothing more if
+     * a sync is already running. [TaskListUiState.Content.isSyncing] shows when one runs.
+     */
+    fun onRefresh() {
+        viewModelScope.launch { syncScheduler.syncNow() }
     }
 
     /** Clears the message the UI has just shown. */

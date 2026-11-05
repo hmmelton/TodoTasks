@@ -12,6 +12,7 @@
     <string name="task_list_overdue">Overdue, due %1$s</string>
     <string name="task_list_overdue_label">Overdue · %1$s</string>
     <string name="task_list_completed">Completed</string>
+    <string name="task_list_sync">Sync</string>
     <string name="task_list_complete_change_failed">Couldn\'t update the task. Try again.</string>
 
     <!-- Due dates -->
