@@ -21,10 +21,7 @@ interface TodoTaskDao {
     @Query("SELECT * FROM todo_tasks WHERE id = :id AND deleted_at IS NULL")
     fun observeTask(id: String): Flow<TodoTaskEntity?>
 
-    /**
-     * Returns the task with [id], or null if it does not exist. Tombstoned tasks are included,
-     * because sync needs to read them.
-     */
+    /** Returns the task with [id], or null if it does not exist. Includes tombstoned tasks. */
     @Query("SELECT * FROM todo_tasks WHERE id = :id")
     suspend fun getTask(id: String): TodoTaskEntity?
 

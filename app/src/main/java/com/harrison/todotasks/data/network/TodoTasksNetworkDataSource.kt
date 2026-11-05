@@ -25,12 +25,8 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * The remote data source: downloads and uploads tasks over the sync server's HTTP API.
- *
- * [httpClient] must resolve relative URLs against the server and handle JSON, as the client from
- * `NetworkModule` does. Failures are thrown, not returned: an [IOException] when the server can't
- * be reached, a [ResponseException] for an unexpected status, and a [JsonConvertException] for a
- * body that isn't the expected JSON. The caller decides whether to retry.
+ * Downloads and uploads tasks over the sync server's HTTP API. [httpClient] must resolve relative
+ * URLs against the server and handle JSON, as the client from `NetworkModule` does.
  */
 @Singleton
 class TodoTasksNetworkDataSource @Inject constructor(
@@ -56,10 +52,8 @@ class TodoTasksNetworkDataSource @Inject constructor(
     }
 
     /**
-     * Uploads [task] if the server's copy is still at the task's version.
-     *
-     * Local edits never change a task's `version`, so it is the server version the edit is based
-     * on, or null if the task has never been synced. The server assigns the stored version itself.
+     * Uploads [task] if the server's copy is still at the task's version, which is null if the
+     * task has never been synced.
      *
      * @return [UploadResult.Accepted] with the stored task, or [UploadResult.Conflict] with the
      * server's task if it has changed since the task's version.

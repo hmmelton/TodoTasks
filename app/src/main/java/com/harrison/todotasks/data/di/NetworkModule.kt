@@ -27,10 +27,7 @@ object NetworkModule {
 
     /**
      * Builds an [HttpClient] on [engine] that resolves relative URLs against [baseUrl] and reads
-     * and writes JSON. Unknown JSON keys are ignored, so the server can add fields without
-     * breaking older apps.
-     *
-     * Tests call this with a mock engine, so they exercise the production configuration.
+     * and writes JSON, ignoring unknown keys. Tests call this with a mock engine.
      */
     fun createHttpClient(engine: HttpClientEngine, baseUrl: String): HttpClient =
         HttpClient(engine) {

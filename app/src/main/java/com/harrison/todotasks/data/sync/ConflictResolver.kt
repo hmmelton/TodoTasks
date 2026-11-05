@@ -13,23 +13,17 @@ class ConflictResolver @Inject constructor() {
     /**
      * Performs a three-way merge of [local] and [remote] against their common ancestor, [base].
      *
-     * `title`, `description`, `dueAt`, and `isComplete` are merged independently, so edits to
-     * different fields both survive. A field changed by only one side takes that side's value.
-     * A field changed to different values by both sides takes the value from the side with the
-     * later `lastUpdatedAt`, because that is the only timestamp available. On a tie, remote wins
-     * because the server is the final authority.
+     * `title`, `description`, `dueAt`, and `isComplete` are merged independently. A field changed
+     * by one side takes that side's value. A field changed by both takes the value from the side
+     * with the later `lastUpdatedAt`, and remote on a tie.
      *
-     * The remaining fields are resolved as follows:
-     * - `id` and `createdAt` come from [remote].
-     * - `version` comes from [remote], so a pending update can rebase on it.
-     * - `deletedAt` is set if either side has a tombstone, preferring [remote] if both do. Deletes
-     *   win over edits.
-     * - `lastUpdatedAt` is the later of the [local] and [remote] values.
+     * `id`, `createdAt`, and `version` come from [remote]. `deletedAt` is set if either side has a
+     * tombstone, preferring [remote], so deletes win over edits. `lastUpdatedAt` is the later of
+     * the two.
      *
      * @param base The last version both sides agreed on.
      * @param local The version on this device.
      * @param remote The version on the server.
-     * @return The merged task.
      */
     fun resolve(base: TodoTask, local: TodoTask, remote: TodoTask): TodoTask {
         val localIsNewer = local.lastUpdatedAt > remote.lastUpdatedAt
@@ -57,10 +51,7 @@ class ConflictResolver @Inject constructor() {
         )
     }
 
-    /**
-     * Merges a single field. Remote is the default choice, which also covers the cases where
-     * neither side changed the field or both sides set the same value.
-     */
+    /** Merges a single field, defaulting to [remote]. */
     private fun <T> mergeField(base: T, local: T, remote: T, localIsNewer: Boolean): T =
         when {
             local == base -> remote

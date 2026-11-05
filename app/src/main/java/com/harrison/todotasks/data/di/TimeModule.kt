@@ -7,7 +7,7 @@ import dagger.hilt.components.SingletonComponent
 import java.time.Clock
 import javax.inject.Singleton
 
-/** Provides the time source, so tests can replace it with a clock they control. */
+/** Provides the time source. */
 @Module
 @InstallIn(SingletonComponent::class)
 object TimeModule {
