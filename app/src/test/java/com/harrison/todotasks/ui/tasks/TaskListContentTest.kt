@@ -69,10 +69,7 @@ class TaskListContentTest {
     // Only the refresh box has the Sync action, so this finds the box around the list.
     private val refreshBox = SemanticsMatcher.keyIsDefined(SemanticsActions.CustomActions)
 
-    /**
-     * Drags from below the app bar, which blocks touches, to the bottom of the screen. That's past
-     * the refresh threshold, since the indicator moves half as far as the finger.
-     */
+    /** Drags from below the app bar, which blocks touches, to the bottom, past the threshold. */
     private fun pullDown() {
         composeRule.onNode(refreshBox).performTouchInput {
             swipeDown(startY = height * PULL_START_FRACTION, endY = bottom)

@@ -149,7 +149,7 @@ class EditTaskViewModelLoadTest {
     }
 
     // A ViewModel created with the same SavedStateHandle stands in for one restored after process
-    // death, which gets the handle's contents back.
+    // death.
 
     @Test
     fun `a restored draft wins over the stored task, without reading it`() = runTest {
