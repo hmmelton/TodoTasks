@@ -19,17 +19,11 @@ import kotlinx.coroutines.flow.map
 internal const val SYNC_WORK_NAME = "sync"
 
 /**
- * Requests background syncs with the server by scheduling [SyncWorker] with WorkManager as unique
- * work, so at most one sync runs or waits at a time.
+ * Schedules [SyncWorker] as unique work, so at most one sync runs or waits at a time. Each sync
+ * waits for a network connection and runs expedited when quota allows.
  *
- * A request while a sync is waiting is absorbed by it. A request while a sync is running is
- * dropped, which is safe: the worker checks for pending rows after uploading and retries if any
- * are left, and the app requests a sync at every start as a backstop.
- *
- * Each sync waits for a network connection, and runs as expedited work when quota allows, so a
- * user's edit reaches the server quickly. The minimum SDK is 31, where expedited work runs as a
- * job, so the worker needs no foreground notification. Retries use WorkManager's default backoff,
- * which is exponential from 30 seconds.
+ * A request while a sync is running is dropped. The worker retries if rows are left after
+ * uploading, and the app requests a sync at every start.
  */
 @Singleton
 class SyncScheduler @Inject constructor(
@@ -37,9 +31,8 @@ class SyncScheduler @Inject constructor(
 ) {
 
     /**
-     * Whether a sync is running now. Emits true only while the sync work is
-     * [WorkInfo.State.RUNNING]. A sync that is waiting for a network or backing off before a retry
-     * is enqueued, not running, so it emits false.
+     * Whether a sync is [WorkInfo.State.RUNNING]. A sync waiting for a network or backing off
+     * emits false.
      */
     val isSyncing: Flow<Boolean> = workManager.getWorkInfosForUniqueWorkFlow(SYNC_WORK_NAME)
         .map { works -> works.any { it.state == WorkInfo.State.RUNNING } }
@@ -51,19 +44,11 @@ class SyncScheduler @Inject constructor(
     }
 
     /**
-     * Requests that tasks are synced with the server now, such as when the user pulls to refresh.
-     * A running sync is left alone, since it is already doing what was asked. A waiting sync is
-     * replaced by a new one, so a sync backing off before a retry runs as soon as the device is
-     * online, instead of after the backoff.
+     * Requests that tasks are synced with the server as soon as the device is online, skipping
+     * any backoff, such as when the user pulls to refresh. A running sync is left alone.
      *
-     * [requestSync]'s KEEP would absorb this into a backed-off sync, and APPEND_OR_REPLACE would
-     * chain it after one, so neither runs it now. WorkManager has no policy that replaces only
-     * waiting work, so this checks the state and then enqueues with REPLACE. If the sync starts
-     * running between the two, REPLACE cancels it, which is safe and costs only a repeated round
-     * trip. Cancellation rolls back any open transaction, so the outbox keeps every row not yet
-     * saved as uploaded. If an upload's PUT reached the server but its response was lost, the new
-     * sync downloads the server's copy and merges it, or uploads with the old base version, gets a
-     * conflict, and merges then. Either way no edit is lost.
+     * A sync that starts between the state check and the REPLACE is cancelled and rerun; no edit
+     * is lost.
      */
     suspend fun syncNow() {
         if (isSyncing.first()) return

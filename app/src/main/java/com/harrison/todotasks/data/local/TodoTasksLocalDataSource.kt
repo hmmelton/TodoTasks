@@ -11,10 +11,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
 /**
- * Local storage for tasks, which is the app's source of truth for them.
- *
- * This is a thin layer over [TodoTaskDao] that maps tasks to [TodoTask]. It does not open
- * transactions; a write made inside a transaction opened on [TodoTaskDatabase] joins it.
+ * Local storage for tasks, the app's source of truth for them. It opens no transactions; a write
+ * inside one opened on [TodoTaskDatabase] joins it.
  */
 @Singleton
 class TodoTasksLocalDataSource @Inject constructor(

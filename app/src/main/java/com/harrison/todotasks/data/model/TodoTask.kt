@@ -1,20 +1,14 @@
 package com.harrison.todotasks.data.model
 
 /**
- * A to-do item as exposed by the data layer.
+ * A to-do item as exposed by the data layer. Timestamps are epoch milliseconds in UTC.
  *
- * All timestamps are epoch milliseconds in UTC.
- *
- * @property id Client-generated UUID, so tasks can be created while offline.
- * @property title Short summary of the task.
- * @property description Longer free-form details.
- * @property createdAt When the task was created.
- * @property lastUpdatedAt When the task was last modified.
- * @property deletedAt When the task was deleted, or null if it is not deleted. A non-null value is
- * a tombstone, which keeps the deletion around long enough to sync it.
+ * @property id Client-generated UUID.
+ * @property deletedAt When the task was deleted, or null if it is not. A non-null value is a
+ * tombstone, kept so the delete can sync.
  * @property dueAt When the task is due, or null if it has no due date.
- * @property isComplete Whether the task has been completed.
- * @property version Server-assigned version, or null if the task has never been synced.
+ * @property version Server-assigned version, or null if the task has never been synced. Local
+ * edits never change it.
  */
 data class TodoTask(
     val id: String,

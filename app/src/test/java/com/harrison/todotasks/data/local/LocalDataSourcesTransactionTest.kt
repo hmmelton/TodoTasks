@@ -14,9 +14,8 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
 /**
- * Checks that a write transaction opened on [TodoTaskDatabase], outside the data sources, covers
- * writes made through both of them. The repository relies on this to commit a task and its
- * outbox row together.
+ * Checks that a write transaction opened on [TodoTaskDatabase] covers writes made through both
+ * local data sources.
  */
 @RunWith(RobolectricTestRunner::class)
 class LocalDataSourcesTransactionTest {

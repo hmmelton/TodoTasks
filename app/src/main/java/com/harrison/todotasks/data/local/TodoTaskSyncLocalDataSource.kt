@@ -7,11 +7,8 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Local storage for sync bookkeeping: the outbox of task updates waiting for upload, and the
- * cursor for downloads.
- *
- * This is a thin layer over the DAOs. When the outbox changes is decided by its callers. It does
- * not open transactions; a write made inside a transaction opened on [TodoTaskDatabase] joins it.
+ * Local storage for the outbox of task updates waiting for upload, and the download cursor. It
+ * opens no transactions; a write inside one opened on [TodoTaskDatabase] joins it.
  */
 @Singleton
 class TodoTaskSyncLocalDataSource @Inject constructor(

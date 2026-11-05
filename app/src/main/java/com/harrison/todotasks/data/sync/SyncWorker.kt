@@ -16,11 +16,8 @@ import java.io.IOException
 private const val TAG = "SyncWorker"
 
 /**
- * Syncs tasks with the server in the background: downloads the server's changes, then uploads the
- * outbox. [SyncScheduler] enqueues it, and WorkManager runs it when the device is online.
- *
- * The worker never retries anything itself. Each run makes one attempt, and returns
- * [Result.retry] to have WorkManager run it again later, with backoff.
+ * Syncs tasks with the server in the background. [SyncScheduler] enqueues it. Each run makes one
+ * attempt, and returns [Result.retry] to have WorkManager retry with backoff.
  */
 @HiltWorker
 class SyncWorker @AssistedInject constructor(
@@ -30,20 +27,14 @@ class SyncWorker @AssistedInject constructor(
 ) : CoroutineWorker(context, params) {
 
     /**
-     * Downloads the server's changes, then uploads the pending outbox rows.
-     *
-     * The download comes first, so remote edits are merged into pending rows before they are
-     * uploaded. That avoids most conflicts, and means the upload's result reflects every merge the
-     * download made.
+     * Downloads the server's changes, then uploads the pending outbox rows. Downloading first
+     * merges remote edits into pending rows before upload, which avoids most conflicts.
      *
      * @return [Result.success] if nothing is left to upload. [Result.retry] if a row is still
-     * pending, such as a merge after a conflict or an edit made during the sync, or if the server
-     * can't be reached, responds with a 5xx status, or sends a body that isn't the expected JSON.
-     * [Result.failure] if the server responds with any other error status, because retrying gets
-     * the same answer. The next requested sync, or the next app start, tries again.
-     * @throws SQLiteException if a database read or write fails. WorkManager then fails the work,
-     * and the failed transaction writes nothing. Cancellation is never caught, so it stops the
-     * sync.
+     * pending, or if the server can't be reached, responds with a 5xx status, or sends a body that
+     * isn't the expected JSON. [Result.failure] for any other error status.
+     * @throws SQLiteException if a database read or write fails. The failed transaction writes
+     * nothing.
      */
     override suspend fun doWork(): Result = try {
         repository.downloadChanges()

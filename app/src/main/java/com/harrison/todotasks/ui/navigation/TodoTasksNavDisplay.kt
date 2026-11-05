@@ -23,16 +23,14 @@ data object TaskList : NavKey
 data class EditTask(val taskId: String?) : NavKey
 
 /**
- * The app's screens, starting on [TaskList].
- *
- * The back stack is saved across configuration changes and process death. Each entry has its own
- * saved state and ViewModel store, so an entry's ViewModel is cleared when it's popped.
+ * The app's screens, starting on [TaskList]. Each entry has its own saved state and ViewModels,
+ * which are cleared when it's popped.
  */
 @Composable
 fun TodoTasksNavDisplay(modifier: Modifier = Modifier) {
     val backStack = rememberNavBackStack(TaskList)
 
-    // Ignores a second tap while the form is already on top, which would push it twice.
+    // Ignores a second tap while the form is already on top.
     fun openEditTask(taskId: String?) {
         if (backStack.lastOrNull() !is EditTask) backStack.add(EditTask(taskId))
     }
@@ -56,8 +54,8 @@ fun TodoTasksNavDisplay(modifier: Modifier = Modifier) {
                 val viewModel = hiltViewModel<EditTaskViewModel, EditTaskViewModel.Factory>(
                     creationCallback = { factory -> factory.create(key.taskId) },
                 )
-                // Removes this entry rather than the top one, so finishing after the user has
-                // already navigated back can't pop the task list too.
+                // Removes this entry, not the top one, so finishing after the user has already
+                // navigated back can't pop the task list.
                 EditTaskScreen(viewModel = viewModel, onBack = { backStack.remove(key) })
             }
         },

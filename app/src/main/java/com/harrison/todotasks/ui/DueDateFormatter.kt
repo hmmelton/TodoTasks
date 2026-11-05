@@ -8,11 +8,8 @@ import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 
 /**
- * Returns a formatter for due dates, in the device's locale.
- *
- * A due date is a calendar day stored as midnight UTC, which is what the Material 3 date picker
- * selects. Formatting in UTC rather than the device's time zone shows the same day that was
- * picked, wherever the device is.
+ * Returns a formatter for due dates in the device's locale. Due dates are midnight UTC, so it
+ * formats in UTC to show the day that was picked wherever the device is.
  */
 @Composable
 fun rememberDueDateFormatter(): DateTimeFormatter {

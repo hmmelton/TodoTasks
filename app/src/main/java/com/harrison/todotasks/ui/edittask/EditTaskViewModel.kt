@@ -27,13 +27,9 @@ import kotlinx.serialization.Serializable
 
 private const val TAG = "EditTaskViewModel"
 
-/** The [SavedStateHandle] key of the [EditTaskDraft]. */
 private const val DRAFT_KEY = "draft"
 
-/**
- * The fields the user has typed into the form but not saved, kept so they survive process death.
- * Whether the task is new follows from the task ID, so it isn't kept.
- */
+/** The unsaved form fields, kept in a [SavedStateHandle] so they survive process death. */
 @Serializable
 private data class EditTaskDraft(
     val title: String,
@@ -46,17 +42,11 @@ private data class EditTaskDraft(
  * [taskId].
  *
  * An existing task is read once to seed the form. Later changes to it, such as from a sync, don't
- * replace what the user is typing; saving writes the form over them. If the task is deleted
- * meanwhile, saving finds it gone and shows [EditTaskUiState.NotFound].
+ * replace the form, and saving writes over them.
  *
- * Every change the user makes to a field is kept in [savedStateHandle] as a draft, so it survives
- * process death. If a draft is restored, the form starts from it and the task isn't read, so the
- * user's typing isn't replaced. A form the user hasn't changed has no draft, so after process death
- * it's read again. Once the task is saved or deleted, the screen leaves and its state is dropped
- * with it.
- *
- * Only one save or delete runs at a time, so a double tap can't create a task twice. A failed write
- * keeps the form and shows an [EditTaskMessage].
+ * Each field change is kept in [savedStateHandle] as a draft. A restored draft seeds the form
+ * instead of reading the task again; an unchanged form has no draft, so the task is re-read.
+ * Only one save or delete runs at a time.
  */
 @HiltViewModel(assistedFactory = EditTaskViewModel.Factory::class)
 class EditTaskViewModel @AssistedInject constructor(
@@ -99,8 +89,8 @@ class EditTaskViewModel @AssistedInject constructor(
     }
 
     /**
-     * Saves the form, creating the task or replacing the edited one, then finishes. Does nothing
-     * unless [EditTaskUiState.Editing.canSave] is true and no other write is in progress.
+     * Saves the form, creating or updating the task, then finishes. Does nothing unless
+     * [EditTaskUiState.Editing.canSave] and no other write is in progress.
      */
     fun onSave() {
         val form = _uiState.value as? EditTaskUiState.Editing ?: return
@@ -170,11 +160,7 @@ class EditTaskViewModel @AssistedInject constructor(
         }
     }
 
-    /**
-     * Applies the user's change [transform] to the form, if the form is showing, and keeps the
-     * result as the draft. The draft is written on every change, not debounced, since writing only
-     * updates [savedStateHandle]'s in-memory map and a delay could lose the last change.
-     */
+    /** Applies the user's change [transform] to the form, if it's showing, and saves the draft. */
     private fun editForm(transform: (EditTaskUiState.Editing) -> EditTaskUiState.Editing) {
         updateForm(transform)
         val form = _uiState.value as? EditTaskUiState.Editing ?: return
@@ -182,7 +168,6 @@ class EditTaskViewModel @AssistedInject constructor(
             encodeToSavedState(EditTaskDraft(form.title, form.description, form.dueAt))
     }
 
-    /** Returns the empty form for adding a task. */
     private fun newTaskForm(): EditTaskUiState.Editing = EditTaskUiState.Editing(
         title = "",
         description = "",
@@ -190,7 +175,6 @@ class EditTaskViewModel @AssistedInject constructor(
         isNewTask = true,
     )
 
-    /** Returns the form seeded for editing [task]. */
     private fun formOf(task: TodoTask): EditTaskUiState.Editing = EditTaskUiState.Editing(
         title = task.title,
         description = task.description,
@@ -198,7 +182,6 @@ class EditTaskViewModel @AssistedInject constructor(
         isNewTask = false,
     )
 
-    /** Returns the form restored from [draft]. */
     private fun formOf(draft: EditTaskDraft): EditTaskUiState.Editing = EditTaskUiState.Editing(
         title = draft.title,
         description = draft.description,
@@ -210,7 +193,7 @@ class EditTaskViewModel @AssistedInject constructor(
     @AssistedFactory
     interface Factory {
 
-        /** Creates a ViewModel that adds a task if [taskId] is null, or edits that task. */
+        /** Creates the ViewModel for [taskId], or for a new task if it's null. */
         fun create(taskId: String?): EditTaskViewModel
     }
 }

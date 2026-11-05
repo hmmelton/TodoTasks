@@ -9,8 +9,6 @@ sealed interface EditTaskUiState {
     /**
      * The form, seeded with the task being edited, or empty when adding one.
      *
-     * @property title The title as typed.
-     * @property description The description as typed.
      * @property dueAt The due date in epoch milliseconds, or null if there is none.
      * @property isNewTask Whether a task is being added rather than edited. Only an existing task
      * can be deleted.
@@ -25,7 +23,7 @@ sealed interface EditTaskUiState {
         val message: EditTaskMessage? = null,
     ) : EditTaskUiState {
 
-        /** Whether the form can be saved, which needs a title that isn't blank. */
+        /** Whether the form can be saved. */
         val canSave: Boolean
             get() = title.isNotBlank()
     }
@@ -42,7 +40,7 @@ sealed interface EditTaskUiState {
 
 /** A message the add or edit task screen shows once, such as in a snackbar. */
 enum class EditTaskMessage {
-    /** The task couldn't be saved. The form keeps what was typed, so saving can be retried. */
+    /** The task couldn't be saved. The form keeps what was typed. */
     SaveFailed,
 
     /** The task couldn't be deleted. */

@@ -22,11 +22,8 @@ private const val TAG = "TaskListViewModel"
  * Holds the state of the task list screen, which shows every task that isn't deleted and lets
  * the user complete tasks and sync them on demand.
  *
- * The list is read from [TodoTasksRepository], so it updates as tasks are edited locally or
- * synced. Syncs are requested from, and observed on, [SyncScheduler] directly, because the
- * repository would only pass the calls through. A failed read replaces the list with
- * [TaskListUiState.Error]. A failed write keeps the list and shows
- * [TaskListMessage.CompleteChangeFailed].
+ * A failed read replaces the list with [TaskListUiState.Error]. A failed write keeps the list and
+ * shows [TaskListMessage.CompleteChangeFailed].
  */
 @HiltViewModel
 class TaskListViewModel @Inject constructor(
@@ -54,10 +51,7 @@ class TaskListViewModel @Inject constructor(
                 initialValue = TaskListUiState.Loading,
             )
 
-    /**
-     * Marks the task with [id] complete or incomplete. If the task was deleted meanwhile, such as
-     * by a sync, nothing happens, and it drops out of the list.
-     */
+    /** Marks the task with [id] complete or not. Does nothing if it was deleted meanwhile. */
     fun onCompleteChange(id: String, isComplete: Boolean) {
         viewModelScope.launch {
             try {
@@ -69,10 +63,7 @@ class TaskListViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Syncs tasks with the server now, such as when the user pulls to refresh. Does nothing more if
-     * a sync is already running. [TaskListUiState.Content.isSyncing] shows when one runs.
-     */
+    /** Syncs tasks with the server now, unless a sync is already running. */
     fun onRefresh() {
         viewModelScope.launch { syncScheduler.syncNow() }
     }

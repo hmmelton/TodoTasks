@@ -6,9 +6,8 @@ import kotlinx.serialization.Serializable
 /**
  * A task on the wire, in both directions. See [TodoTask] for the meaning of each field.
  *
- * @property version In an upload, the server version the edit is based on, or null if the task has
- * never been synced; the server compares it with its own copy and never stores it. In a response,
- * the version the server assigned, which is never null in practice.
+ * @property version In an upload, the server version the edit is based on, or null if never
+ * synced. In a response, the version the server assigned, which is never null.
  */
 @Serializable
 data class NetworkTodoTask(

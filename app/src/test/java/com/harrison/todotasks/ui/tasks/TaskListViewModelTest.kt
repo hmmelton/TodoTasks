@@ -25,9 +25,8 @@ import org.robolectric.RobolectricTestRunner
 /**
  * Checks the task list's states and events against a mock repository and sync scheduler.
  *
- * Main is unconfined, so a repository flow that emits without suspending replaces
- * [TaskListUiState.Loading] before Turbine sees it. The loading test emits from a
- * [MutableSharedFlow] instead.
+ * Main is unconfined, so a flow that emits without suspending replaces [TaskListUiState.Loading]
+ * before Turbine sees it. The loading test emits from a [MutableSharedFlow] instead.
  */
 // Robolectric provides android.util.Log and the SQLiteException the repository throws.
 @RunWith(RobolectricTestRunner::class)

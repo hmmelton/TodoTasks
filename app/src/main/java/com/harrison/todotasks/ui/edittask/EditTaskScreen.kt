@@ -45,7 +45,6 @@ import com.harrison.todotasks.ui.theme.TodoTasksTheme
 import java.time.LocalDate
 import java.time.ZoneOffset
 
-/** The gap between a full-screen message and the button under it. */
 private val StateMessageButtonGap = 16.dp
 
 /**
@@ -59,8 +58,6 @@ fun EditTaskScreen(
     modifier: Modifier = Modifier,
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    // Keyed on finishing rather than the whole state, so typing doesn't relaunch the effect, which
-    // calls the latest callback.
     val isFinished = uiState == EditTaskUiState.Finished
     val currentOnBack by rememberUpdatedState(onBack)
     LaunchedEffect(isFinished) {
@@ -81,9 +78,8 @@ fun EditTaskScreen(
 }
 
 /**
- * Shows [uiState]: the form, with Save under it and, for an existing task, Delete in the app bar,
- * which asks first. An [EditTaskUiState.Editing.message] shows in a snackbar, then [onMessageShown]
- * is called.
+ * Shows [uiState]: the form and, for an existing task, a Delete action that asks first. An
+ * [EditTaskUiState.Editing.message] shows in a snackbar, then [onMessageShown] is called.
  *
  * @param today The device's current date, which the Today and Tomorrow due dates are based on.
  */
@@ -107,7 +103,6 @@ fun EditTaskContent(
         EditTaskMessage.DeleteFailed -> stringResource(R.string.edit_task_delete_failed)
         null -> null
     }
-    // The snackbar shows for seconds, so the effect calls the latest callback without restarting.
     val currentOnMessageShown by rememberUpdatedState(onMessageShown)
     LaunchedEffect(message) {
         if (messageText != null) {
@@ -168,10 +163,6 @@ fun EditTaskContent(
     }
 }
 
-/**
- * The cobalt app bar, titled for adding or editing, with up navigation and, when [canDelete], a
- * Delete action that calls [onDelete].
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun EditTaskTopBar(
@@ -216,7 +207,6 @@ private fun EditTaskTopBar(
     )
 }
 
-/** Asks before deleting the task, which [onConfirm] does. */
 @Composable
 private fun DeleteTaskDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
     AlertDialog(

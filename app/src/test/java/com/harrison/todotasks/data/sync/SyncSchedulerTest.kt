@@ -25,9 +25,8 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
 /**
- * Covers how sync requests are enqueued as unique work, against a test WorkManager, and how the
- * sync's state is read, against a mock WorkManager whose work states the test sets. The test
- * WorkManager can't hold work in [WorkInfo.State.RUNNING] without running the real worker.
+ * Covers how sync requests are enqueued, against a test WorkManager, and how the sync's state is
+ * read, against a mock WorkManager, since the test one can't hold work in [WorkInfo.State.RUNNING].
  */
 @RunWith(RobolectricTestRunner::class)
 class SyncSchedulerTest {
