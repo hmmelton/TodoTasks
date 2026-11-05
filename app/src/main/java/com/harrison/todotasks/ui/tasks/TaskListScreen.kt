@@ -49,6 +49,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -57,8 +58,10 @@ import com.harrison.todotasks.data.model.TodoTask
 import com.harrison.todotasks.ui.DueDates
 import com.harrison.todotasks.ui.rememberDueDateFormatter
 import com.harrison.todotasks.ui.theme.Dimens
+import com.harrison.todotasks.ui.theme.TodoTasksTheme
 import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneOffset
 
 private const val TASK_CONTENT_TYPE = "task"
 private const val COMPLETED_HEADER_KEY = "completed-header"
@@ -419,4 +422,62 @@ private fun CenteredBox(contentPadding: PaddingValues, content: @Composable () -
     ) {
         content()
     }
+}
+
+private val previewToday = LocalDate.of(2026, 11, 4)
+
+// Titles, due dates as days from today, and completion.
+private val previewTasks = listOf(
+    Triple("Pay the electric bill", -2L, false),
+    Triple("Buy groceries", 0L, false),
+    Triple("Call the dentist", 1L, false),
+    Triple("Book flights", 20L, false),
+    Triple("Renew passport", null, true),
+    Triple("Return library books", -1L, true),
+).mapIndexed { index, (title, dueIn, isComplete) ->
+    TodoTask(
+        id = "$index",
+        title = title,
+        description = if (index == 1) "Milk, eggs, and bread" else "",
+        createdAt = 0,
+        lastUpdatedAt = 0,
+        deletedAt = null,
+        dueAt = dueIn?.let {
+            previewToday.plusDays(it).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+        },
+        isComplete = isComplete,
+        version = null,
+    )
+}
+
+@Composable
+private fun TaskListPreview(uiState: TaskListUiState, darkTheme: Boolean) {
+    TodoTasksTheme(darkTheme = darkTheme) {
+        TaskListContent(
+            uiState = uiState,
+            today = previewToday,
+            onTaskClick = {},
+            onCompleteChange = { _, _ -> },
+            onAddTask = {},
+            onMessageShown = {},
+        )
+    }
+}
+
+@Preview(name = "Light")
+@Composable
+private fun TaskListContentPreview() {
+    TaskListPreview(TaskListUiState.Content(previewTasks), darkTheme = false)
+}
+
+@Preview(name = "Dark")
+@Composable
+private fun TaskListContentDarkPreview() {
+    TaskListPreview(TaskListUiState.Content(previewTasks), darkTheme = true)
+}
+
+@Preview(name = "Empty")
+@Composable
+private fun TaskListEmptyPreview() {
+    TaskListPreview(TaskListUiState.Content(emptyList()), darkTheme = false)
 }
