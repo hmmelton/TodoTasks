@@ -1,5 +1,6 @@
 package com.harrison.todotasks.ui.edittask
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.sqlite.SQLiteException
 import com.harrison.todotasks.data.local.sparseTask
 import com.harrison.todotasks.data.repository.TodoTasksRepository
@@ -27,6 +28,8 @@ class EditTaskViewModelWriteTest {
     val mainDispatcherRule = MainDispatcherRule()
 
     private val repository = mockk<TodoTasksRepository>()
+
+    private val savedStateHandle = SavedStateHandle()
 
     private val task = sparseTask.copy(title = "Title", description = "Details", dueAt = 4L)
 
@@ -133,11 +136,13 @@ class EditTaskViewModelWriteTest {
 
     /** Creates a ViewModel adding a task, with [title] typed in. */
     private fun newTaskViewModel(title: String): EditTaskViewModel =
-        EditTaskViewModel(taskId = null, repository = repository).apply { onTitleChange(title) }
+        EditTaskViewModel(taskId = null, savedStateHandle, repository).apply {
+            onTitleChange(title)
+        }
 
     /** Creates a ViewModel editing [task], with the form already seeded. */
     private fun editTaskViewModel(): EditTaskViewModel {
         every { repository.observeTask(task.id) } returns flowOf(task)
-        return EditTaskViewModel(task.id, repository)
+        return EditTaskViewModel(task.id, savedStateHandle, repository)
     }
 }

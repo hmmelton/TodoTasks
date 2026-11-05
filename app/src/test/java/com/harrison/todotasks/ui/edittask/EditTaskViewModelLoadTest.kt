@@ -1,5 +1,6 @@
 package com.harrison.todotasks.ui.edittask
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.sqlite.SQLiteException
 import app.cash.turbine.test
 import com.harrison.todotasks.data.local.sparseTask
@@ -31,11 +32,13 @@ class EditTaskViewModelLoadTest {
 
     private val repository = mockk<TodoTasksRepository>()
 
+    private val savedStateHandle = SavedStateHandle()
+
     private val task = sparseTask.copy(title = "Title", description = "Details", dueAt = 4L)
 
     @Test
     fun `adding a task starts with an empty form and reads nothing`() = runTest {
-        val viewModel = EditTaskViewModel(taskId = null, repository = repository)
+        val viewModel = EditTaskViewModel(taskId = null, savedStateHandle, repository)
 
         assertEquals(
             EditTaskUiState.Editing(title = "", description = "", dueAt = null, isNewTask = true),
@@ -49,7 +52,7 @@ class EditTaskViewModelLoadTest {
         val observed = MutableSharedFlow<TodoTask?>()
         every { repository.observeTask(task.id) } returns observed
 
-        EditTaskViewModel(task.id, repository).uiState.test {
+        EditTaskViewModel(task.id, savedStateHandle, repository).uiState.test {
             assertEquals(EditTaskUiState.Loading, awaitItem())
 
             observed.emit(task)
@@ -70,7 +73,7 @@ class EditTaskViewModelLoadTest {
         val observed = MutableSharedFlow<TodoTask?>(replay = 1)
         observed.emit(task)
         every { repository.observeTask(task.id) } returns observed
-        val viewModel = EditTaskViewModel(task.id, repository)
+        val viewModel = EditTaskViewModel(task.id, savedStateHandle, repository)
         viewModel.onTitleChange("Typed")
 
         observed.emit(task.copy(title = "Synced"))
@@ -82,7 +85,7 @@ class EditTaskViewModelLoadTest {
     fun `editing a missing or deleted task shows not found`() = runTest {
         every { repository.observeTask(task.id) } returns flowOf(null)
 
-        val viewModel = EditTaskViewModel(task.id, repository)
+        val viewModel = EditTaskViewModel(task.id, savedStateHandle, repository)
 
         assertEquals(EditTaskUiState.NotFound, viewModel.uiState.value)
     }
@@ -93,14 +96,14 @@ class EditTaskViewModelLoadTest {
             throw SQLiteException("Disk I/O error")
         }
 
-        val viewModel = EditTaskViewModel(task.id, repository)
+        val viewModel = EditTaskViewModel(task.id, savedStateHandle, repository)
 
         assertEquals(EditTaskUiState.Error, viewModel.uiState.value)
     }
 
     @Test
     fun `field changes update the form`() = runTest {
-        val viewModel = EditTaskViewModel(taskId = null, repository = repository)
+        val viewModel = EditTaskViewModel(taskId = null, savedStateHandle, repository)
 
         viewModel.onTitleChange("Title")
         viewModel.onDescriptionChange("Details")
@@ -137,10 +140,87 @@ class EditTaskViewModelLoadTest {
     @Test
     fun `field changes are ignored until the form is showing`() = runTest {
         every { repository.observeTask(task.id) } returns MutableSharedFlow()
-        val viewModel = EditTaskViewModel(task.id, repository)
+        val viewModel = EditTaskViewModel(task.id, savedStateHandle, repository)
 
         viewModel.onTitleChange("Typed")
 
         assertEquals(EditTaskUiState.Loading, viewModel.uiState.value)
+        assertTrue(savedStateHandle.keys().isEmpty())
+    }
+
+    // A ViewModel created with the same SavedStateHandle stands in for one restored after process
+    // death, which gets the handle's contents back.
+
+    @Test
+    fun `a restored draft wins over the stored task, without reading it`() = runTest {
+        every { repository.observeTask(task.id) } returns flowOf(task)
+        EditTaskViewModel(task.id, savedStateHandle, repository).onTitleChange("Typed")
+
+        val restored = EditTaskViewModel(task.id, savedStateHandle, repository)
+
+        assertEquals(
+            EditTaskUiState.Editing(
+                title = "Typed",
+                description = "Details",
+                dueAt = 4L,
+                isNewTask = false,
+            ),
+            restored.uiState.value,
+        )
+        // Only the first ViewModel read the task, to seed its form.
+        verify(exactly = 1) { repository.observeTask(task.id) }
+    }
+
+    @Test
+    fun `a restored draft for a new task restores the form`() = runTest {
+        EditTaskViewModel(taskId = null, savedStateHandle, repository).apply {
+            onTitleChange("Title")
+            onDescriptionChange("Details")
+            onDueAtChange(4L)
+        }
+
+        val restored = EditTaskViewModel(taskId = null, savedStateHandle, repository)
+
+        assertEquals(
+            EditTaskUiState.Editing(
+                title = "Title",
+                description = "Details",
+                dueAt = 4L,
+                isNewTask = true,
+            ),
+            restored.uiState.value,
+        )
+    }
+
+    @Test
+    fun `every field change is written to the handle right away`() = runTest {
+        every { repository.observeTask(task.id) } returns flowOf(task)
+        val viewModel = EditTaskViewModel(task.id, savedStateHandle, repository)
+
+        viewModel.onDescriptionChange("D")
+        viewModel.onDescriptionChange("Do")
+        viewModel.onDueAtChange(null)
+
+        assertEquals(
+            EditTaskUiState.Editing(
+                title = "Title",
+                description = "Do",
+                dueAt = null,
+                isNewTask = false,
+            ),
+            EditTaskViewModel(task.id, savedStateHandle, repository).uiState.value,
+        )
+    }
+
+    @Test
+    fun `an unchanged form keeps no draft, so the task is read again`() = runTest {
+        every { repository.observeTask(task.id) } returns flowOf(task)
+        EditTaskViewModel(task.id, savedStateHandle, repository)
+        every { repository.observeTask(task.id) } returns flowOf(task.copy(title = "Synced"))
+
+        val restored = EditTaskViewModel(task.id, savedStateHandle, repository)
+
+        assertTrue(savedStateHandle.keys().isEmpty())
+        assertEquals("Synced", (restored.uiState.value as EditTaskUiState.Editing).title)
     }
 }
