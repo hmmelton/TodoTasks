@@ -52,6 +52,10 @@ android {
     }
 }
 
+composeCompiler {
+    stabilityConfigurationFiles.add(layout.projectDirectory.file("compose_stability.conf"))
+}
+
 room3 {
     schemaDirectory("$projectDir/schemas")
 }
