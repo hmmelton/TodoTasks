@@ -11,9 +11,9 @@ import androidx.compose.ui.platform.LocalContext
 /**
  * The app's Material 3 theme, which uses the cobalt color schemes and the system font.
  *
- * @param darkTheme Whether to use the dark color scheme, which follows the system by default.
+ * @param darkTheme Whether to use the dark color scheme.
  * @param dynamicColor Whether to use the wallpaper-based color scheme instead, on Android 12 and
- * later. It's off by default, so the app keeps its cobalt colors.
+ * later.
  */
 @Composable
 fun TodoTasksTheme(

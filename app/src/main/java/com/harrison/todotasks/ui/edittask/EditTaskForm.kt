@@ -47,31 +47,21 @@ import com.harrison.todotasks.ui.theme.Dimens
 import java.time.Instant
 import java.time.LocalDate
 
-/** The gap between the card of fields and the Save button. */
 private val SaveButtonGap = 16.dp
-
-/** The padding inside the card of fields. */
 private val FieldsCardPadding = 16.dp
-
-/** The gap between the fields in the card. */
 private val FieldGap = 16.dp
-
-/** The gap between the due date summary and the choices under it. */
 private val DueDateSummaryGap = 4.dp
 
 /** Keeps the due date summary as tall as its clear button, so it doesn't jump when that appears. */
 private val DueDateSummaryMinHeight = 48.dp
 
-/** The gap between the due date choice chips. */
 private val DueDateChoiceGap = 8.dp
 
 /**
- * The add or edit task form: its fields, grouped in a card, above a Save button that's enabled when
- * [canSave] and calls [onSave]. The fields are a title, a description, and a due date that is set
- * to today or tomorrow, picked from a date picker dialog, or cleared.
+ * The add or edit task form: a title, a description, and a due date that can be set to today or
+ * tomorrow, picked from a date picker, or cleared, above a Save button enabled when [canSave].
  *
- * [dueAt] is midnight UTC of the due day, which is what the date picker selects, so it round-trips
- * through the picker unchanged.
+ * [dueAt] is midnight UTC of the due day, which is what the date picker selects.
  *
  * @param today The device's current date, which the Today and Tomorrow choices are based on.
  */
@@ -125,7 +115,6 @@ fun EditTaskForm(
     }
 }
 
-/** The title, description, and due date fields, grouped in a card. */
 @Composable
 private fun TaskFieldsCard(
     title: String,
@@ -163,7 +152,6 @@ private fun TaskFieldsCard(
     }
 }
 
-/** A single-line title field, whose keyboard action moves on to the description. */
 @Composable
 private fun TitleField(title: String, onTitleChange: (String) -> Unit, colors: TextFieldColors) {
     OutlinedTextField(
@@ -180,7 +168,6 @@ private fun TitleField(title: String, onTitleChange: (String) -> Unit, colors: T
     )
 }
 
-/** A description field at least three lines tall. */
 @Composable
 private fun DescriptionField(
     description: String,
@@ -200,10 +187,6 @@ private fun DescriptionField(
     )
 }
 
-/**
- * The due date, or None, with a button that clears it, above choices for today, tomorrow, or a
- * picked day. Choosing the day that's already selected clears it.
- */
 @Composable
 private fun DueDateField(
     dueAt: Long?,
@@ -235,7 +218,6 @@ private fun DueDateField(
     }
 }
 
-/** The Due date heading above [dueAt] as a date, or None. */
 @Composable
 private fun DueDateSummary(dueAt: Long?, modifier: Modifier = Modifier) {
     val formatter = rememberDueDateFormatter()
@@ -253,10 +235,7 @@ private fun DueDateSummary(dueAt: Long?, modifier: Modifier = Modifier) {
     }
 }
 
-/**
- * Chips for today, tomorrow, and a picked day, the one matching [dueAt] selected. Today and
- * Tomorrow set the due date, or clear it when already selected, and the third calls [onPick].
- */
+/** Chips for today, tomorrow, and a picked day. Today or Tomorrow clears the date if selected. */
 @Composable
 private fun DueDateChoices(
     dueAt: Long?,
@@ -292,7 +271,6 @@ private fun DueDateChoices(
     }
 }
 
-/** A date picker starting on [dueAt], whose OK button passes the selected day to [onConfirm]. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun DueDatePickerDialog(

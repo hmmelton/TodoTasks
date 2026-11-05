@@ -4,9 +4,8 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.ui.graphics.Color
 
-// The cobalt color schemes, generated from the seed #2457F5 with Material Color Utilities'
-// content scheme, which Material Theme Builder uses when it matches the seed color. The content
-// scheme keeps the seed's chroma, so primaryContainer is the seed itself in both themes.
+// Generated from the seed #2457F5 with Material Color Utilities' content scheme, which keeps the
+// seed as primaryContainer in both themes.
 
 /** The light cobalt color scheme. */
 internal val CobaltLightColorScheme = lightColorScheme(

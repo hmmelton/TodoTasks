@@ -5,11 +5,10 @@ import java.time.LocalDate
 import java.time.ZoneOffset
 
 /**
- * Compares due dates with [today], the device's current calendar day.
+ * Compares due dates with [today], the device's current date.
  *
- * A due date is midnight UTC of its calendar day, which is what the Material 3 date picker
- * selects, so today and tomorrow are expressed the same way: as midnight UTC of the device's
- * local dates. That keeps a task picked for today showing as today wherever the device is.
+ * A due date is midnight UTC of its calendar day, as the Material 3 date picker selects, so
+ * [today] and [tomorrow] are midnight UTC of the device's local dates.
  */
 class DueDates(today: LocalDate) {
 
