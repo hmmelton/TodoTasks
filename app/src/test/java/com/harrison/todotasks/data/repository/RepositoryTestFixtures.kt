@@ -35,9 +35,8 @@ class MutableClock(var nowMillis: Long = 1_000L) : Clock() {
 }
 
 /**
- * Builds a [TodoTasksRepository] over a real in-memory database and real data sources, with a
- * clock the test controls, a [server] that answers with [respond], and a mock [syncScheduler] that
- * records the syncs requested. Tests seed and inspect storage through [tasks] and [sync].
+ * Builds a [TodoTasksRepository] over a real in-memory database, a [server] that answers with
+ * [respond], and a mock [syncScheduler]. Tests seed and inspect storage through [tasks] and [sync].
  */
 @RunWith(RobolectricTestRunner::class)
 abstract class RepositoryTest {
@@ -110,9 +109,8 @@ abstract class RepositoryTest {
     }
 
     /**
-     * Makes inserting an outbox row fail for [taskId], or for every task if it is null, standing
-     * in for a disk error partway through a transaction. Room's upsert always inserts first, so
-     * edits to an existing row fail too.
+     * Makes inserting an outbox row fail for [taskId], or for every task if it is null. Room's
+     * upsert always inserts first, so edits to an existing row fail too.
      */
     protected suspend fun failOutboxWrites(taskId: String? = null) {
         val condition = taskId?.let { "NEW.task_id = '$it'" } ?: "1"

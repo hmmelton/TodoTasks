@@ -28,28 +28,17 @@ import kotlinx.coroutines.flow.Flow
 private const val TAG = "TodoTasksRepository"
 
 /**
- * The entry point to task data for the rest of the app, using offline-first lazy writes.
+ * The entry point to task data, with offline-first writes. The local database is the source of
+ * truth for reads.
  *
- * Reads come only from the local database, which is the source of truth. Each write changes the
- * local tasks and queues them for upload in one transaction, so a task is never changed without
- * being queued, and the outbox never holds a change that was rolled back.
+ * Each write changes the task and its outbox row in one transaction, then requests a sync once it
+ * commits. Writes never throw for a bad request: a rejected write writes nothing, logs a warning,
+ * and returns null or false, and a write that would change nothing writes nothing. Deleted tasks
+ * can't be edited.
  *
- * Writes validate against the stored tasks inside that transaction, and never throw for a bad
- * request. A rejected write writes nothing, logs a warning, and returns null or false. A write
- * that would change nothing, or that completes or deletes a task that is gone, is a no-op: it
- * writes nothing, not even an outbox row. Database failures still throw a [SQLiteException],
- * after rolling back the transaction.
- *
- * Only tasks that are not deleted can be edited, because they are the only ones the UI can show.
- *
- * Each write that saves something requests a sync from [SyncScheduler] once its transaction has
- * committed, so the sync can never start before the change it uploads is stored.
- *
- * Sync uploads the outbox later with [uploadPendingChanges] and downloads the server's changes
- * with [downloadChanges]. [SyncWorker] runs them, and WorkManager decides when to run it and when
- * to retry. Network calls are never made inside a database transaction, so local writes are never
- * blocked on the network. Instead, each outbox row's revision is checked after the call, so an
- * edit made during an upload is never lost.
+ * [SyncWorker] runs [downloadChanges] and [uploadPendingChanges]. Network calls are never made
+ * inside a transaction; outbox revisions are checked afterwards, so an edit made during an upload
+ * is never lost.
  */
 @Singleton
 class TodoTasksRepository @Inject constructor(
@@ -101,10 +90,10 @@ class TodoTasksRepository @Inject constructor(
 
     /**
      * Replaces the title, description, and due date of the task with [id], and queues the change
-     * for upload. Does nothing if the values are unchanged.
+     * for upload.
      *
-     * @return True if the edit was saved or changed nothing, or false if nothing was saved because
-     * [title] is blank or the task is missing or deleted.
+     * @return True if the edit was saved or changed nothing, or false if [title] is blank or the
+     * task is missing or deleted.
      * @throws SQLiteException if the database write fails. Nothing is written.
      */
     suspend fun updateTask(id: String, title: String, description: String, dueAt: Long?): Boolean {
@@ -127,11 +116,10 @@ class TodoTasksRepository @Inject constructor(
     }
 
     /**
-     * Marks the task with [id] complete or incomplete, and queues the change for upload. Does
-     * nothing if it is already in that state.
+     * Marks the task with [id] complete or incomplete, and queues the change for upload.
      *
-     * @return True if the change was saved or changed nothing, or false if nothing was saved
-     * because the task is missing or deleted.
+     * @return True if the change was saved or changed nothing, or false if the task is missing or
+     * deleted.
      * @throws SQLiteException if the database write fails. Nothing is written.
      */
     suspend fun setComplete(id: String, isComplete: Boolean): Boolean {
@@ -164,25 +152,18 @@ class TodoTasksRepository @Inject constructor(
 
     /**
      * Uploads each pending outbox row once, oldest first. Failed rows are skipped until a new edit
-     * clears their failure.
+     * clears their failure. Each outcome is saved in its own transaction:
+     * - Accepted: the stored task replaces the local one and the row is deleted, unless the task
+     *   was edited during the upload. Then the edit is rebased onto the stored version and stays
+     *   pending.
+     * - Conflict: the local task is merged with the server's using [ConflictResolver]. The row is
+     *   deleted if the merge is the server's task, and otherwise stays pending.
+     * - 4xx: the row is marked failed and the next row is uploaded.
      *
-     * Each task is sent with its version as the base version, and the outcome is saved in one
-     * transaction:
-     * - Accepted: the stored task replaces the local one and the row is deleted. If the task was
-     *   edited during the upload, the edit is kept instead and rebased onto the stored version, so
-     *   it is uploaded on the next sync.
-     * - Conflict: the local task is merged with the server's using [ConflictResolver], and takes
-     *   the server's version. If the merge is the server's task, nothing is left to upload and the
-     *   row is deleted. Otherwise the row stays pending, so the merge is uploaded on the next sync.
-     * - Rejected with a 4xx status: the server will keep rejecting the row, so it is marked
-     *   failed, a warning is logged, and the next row is uploaded.
-     *
-     * Any other failure stops the upload. Rows already uploaded stay uploaded, and the rest stay
-     * pending, so calling this again later picks up where it stopped. This never retries an
-     * upload itself; [SyncWorker] schedules the next attempt.
+     * Any other failure stops the upload, leaving the remaining rows pending. Never retries.
      *
      * @return True if no rows are left pending, or false if some still need uploading, such as a
-     * merge after a conflict or an edit made during this sync, so the caller should sync again.
+     * merge after a conflict or an edit made during this sync.
      * @throws IOException if the server can't be reached.
      * @throws ResponseException if the server responds with a 5xx status.
      * @throws JsonConvertException if a response body isn't the expected JSON.
@@ -197,19 +178,14 @@ class TodoTasksRepository @Inject constructor(
     }
 
     /**
-     * Downloads every task that changed on the server since the stored cursor, and saves them.
+     * Downloads every task that changed on the server since the stored cursor, and saves them with
+     * the new cursor in one transaction. Each task is saved according to its outbox row:
+     * - No row: the server's task replaces the local one.
+     * - A row, and the local task has the server's version: the local edit is already based on
+     *   it, so it is kept.
+     * - A row, and the versions differ: the two are merged as after an upload conflict.
      *
-     * Each downloaded task is saved according to its outbox row:
-     * - No row: nothing local is pending, so the server's task replaces the local one.
-     * - A row, pending or failed, and the local task has the server's version: the local edit is
-     *   already based on the server's task, such as an accepted upload echoed back, so it is kept.
-     * - A row, and the versions differ: the local task is merged with the server's using
-     *   [ConflictResolver], as after an upload conflict. If the row is pending, the merge is
-     *   uploaded by the next [uploadPendingChanges].
-     *
-     * The download is made outside any transaction. The tasks and the new cursor are then saved in
-     * one transaction, so a crash never skips a download or saves only part of one. This never
-     * retries a download itself; [SyncWorker] schedules the next attempt.
+     * Never retries.
      *
      * @throws IOException if the server can't be reached.
      * @throws ResponseException if the server responds with a non-2xx status.
@@ -239,7 +215,7 @@ class TodoTasksRepository @Inject constructor(
         val result = try {
             tasksNetworkDataSource.putTask(task)
         } catch (e: ResponseException) {
-            // Retrying a 4xx gets the same answer, so stop retrying this row. A 5xx may pass later.
+            // A 4xx will keep failing, so stop retrying this row. A 5xx may pass later.
             if (e.response.status.value !in 400..499) throw e
             Log.w(TAG, "Server rejected the upload of task $taskId: ${e.response.status}", e)
             syncLocalDataSource.markTaskUpdateFailedIfRevisionMatches(
@@ -256,12 +232,8 @@ class TodoTasksRepository @Inject constructor(
     }
 
     /**
-     * Saves [stored], the server's copy of an accepted upload of the outbox row at [revision].
-     *
-     * If the row is still at [revision], the server has every local change, so [stored] replaces
-     * the local task and the row is deleted. Otherwise the task was edited during the upload. The
-     * edit is kept and rebased onto [stored]: the task takes its version, and [stored] becomes the
-     * row's base. The row stays pending.
+     * Saves [stored], the server's copy of an accepted upload of the outbox row at [revision]. If
+     * the row has moved past [revision], the newer edit is kept and rebased onto [stored].
      */
     private suspend fun saveAcceptedUpload(revision: Long, stored: TodoTask) {
         todoTaskDatabase.withWriteTransaction {
@@ -279,10 +251,7 @@ class TodoTasksRepository @Inject constructor(
         }
     }
 
-    /**
-     * Merges the local task with [remote], the server's copy after a conflict, and saves the
-     * merge. See [mergeIntoQueuedTask].
-     */
+    /** Merges the local task with [remote], the server's copy after a conflict, and saves it. */
     private suspend fun saveMergedConflict(remote: TodoTask) {
         todoTaskDatabase.withWriteTransaction {
             val update = checkNotNull(syncLocalDataSource.getTaskUpdate(remote.id)) {
@@ -292,10 +261,7 @@ class TodoTasksRepository @Inject constructor(
         }
     }
 
-    /**
-     * Saves [remote], a downloaded task, as described in [downloadChanges]. Must run inside a
-     * write transaction.
-     */
+    /** Saves [remote], a downloaded task, as described in [downloadChanges]. Needs a transaction. */
     private suspend fun saveDownloadedTask(remote: TodoTask) {
         val update = syncLocalDataSource.getTaskUpdate(remote.id)
         when {
@@ -308,16 +274,12 @@ class TodoTasksRepository @Inject constructor(
 
     /**
      * Merges the local task, which has the outbox row [update], with [remote], the server's newer
-     * copy, and saves the merge, which carries the server's version. Must run inside a write
-     * transaction.
+     * copy, and saves the merge. Must run inside a write transaction.
      *
-     * The row's base is the common ancestor. A row with no base is a task that was never synced,
-     * but the server already has it, such as when an earlier upload's response was lost. Then
-     * [remote] stands in for the base, so every local field that differs from it wins.
-     *
-     * If the merge is [remote], nothing is left to upload and the row is deleted. Otherwise
-     * [remote] becomes the row's base, and the row keeps its revision and failure, so a pending row
-     * uploads the merge next.
+     * The row's base is the common ancestor. A row with no base is an unsynced task the server
+     * already has, such as after a lost upload response, so [remote] stands in for the base.
+     * If the merge is [remote] the row is deleted. Otherwise [remote] becomes the row's base, and
+     * the row keeps its revision and failure.
      */
     private suspend fun mergeIntoQueuedTask(update: TodoTaskUpdateEntity, remote: TodoTask) {
         val base = update.base?.asTodoTask() ?: remote
@@ -330,10 +292,7 @@ class TodoTasksRepository @Inject constructor(
         }
     }
 
-    /**
-     * Returns the task with [id], which has an outbox row. Tasks are only tombstoned, never
-     * removed, so a task with a row always exists.
-     */
+    /** Returns the task with [id], which has an outbox row, so it always exists. */
     private suspend fun getQueuedTask(id: String): TodoTask =
         checkNotNull(tasksLocalDataSource.getTask(id)) { "Task $id has an outbox row but no task" }
 
@@ -341,22 +300,14 @@ class TodoTasksRepository @Inject constructor(
     private suspend fun getLiveTask(id: String): TodoTask? =
         tasksLocalDataSource.getTask(id)?.takeIf { it.deletedAt == null }
 
-    /**
-     * Saves [edited] with a new `lastUpdatedAt`, unless it is the same as [previous].
-     *
-     * @return [EditResult.Saved], or [EditResult.Unchanged] if nothing was written.
-     */
+    /** Saves [edited] with a new `lastUpdatedAt`, unless it is the same as [previous]. */
     private suspend fun saveEditIfChanged(previous: TodoTask, edited: TodoTask): EditResult {
         if (edited == previous) return EditResult.Unchanged
         saveEdit(previous, edited.copy(lastUpdatedAt = clock.millis()))
         return EditResult.Saved
     }
 
-    /**
-     * Requests a sync if an edit's committed transaction saved something.
-     *
-     * @return False if the edit was rejected, or true otherwise.
-     */
+    /** Requests a sync if [result] saved something, and returns false only if it was rejected. */
     private fun requestSyncIfSaved(result: EditResult): Boolean {
         if (result == EditResult.Saved) syncScheduler.requestSync()
         return result != EditResult.Rejected
@@ -365,14 +316,10 @@ class TodoTasksRepository @Inject constructor(
     /**
      * Writes [edited] and records the edit in the outbox. Must run inside a write transaction.
      *
-     * If the task already has an outbox row, its base is kept, because that is still the last
-     * copy the server agreed on. Its revision is incremented, so an upload of the older revision
-     * doesn't clear the row, and its failure is cleared, so the new edit is retried.
+     * An existing row keeps its base, increments its revision, and clears its failure. A new row
+     * starts at revision 1, with [previous] as the base only if it has been synced.
      *
-     * Otherwise a row at revision 1 is created, with [previous] as the base if it has been synced.
-     * A task that has never been synced, including a new one, has no base.
-     *
-     * @param previous The task as it was before this edit, or null if it is being created.
+     * @param previous The task before this edit, or null if it is being created.
      */
     private suspend fun saveEdit(previous: TodoTask?, edited: TodoTask) {
         tasksLocalDataSource.upsertTask(edited)
