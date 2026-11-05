@@ -1,10 +1,12 @@
 package com.harrison.todotasks.ui.edittask
 
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.getBoundsInRoot
+import androidx.compose.ui.test.hasProgressBarRangeInfo
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -203,5 +205,45 @@ class EditTaskContentTest {
         composeRule.onNodeWithContentDescription("Navigate up").performClick()
 
         assertEquals(1, backs)
+    }
+
+    @Test
+    fun `loading shows a progress indicator`() {
+        setContent(EditTaskUiState.Loading)
+
+        composeRule
+            .onNode(hasProgressBarRangeInfo(ProgressBarRangeInfo.Indeterminate))
+            .assertExists()
+        composeRule.onNodeWithText("Save").assertDoesNotExist()
+    }
+
+    @Test
+    fun `a missing task says so and offers a way back`() {
+        setContent(EditTaskUiState.NotFound)
+
+        composeRule.onNodeWithText("This task no longer exists.").assertExists()
+        composeRule.onNodeWithText("Back to tasks").performClick()
+
+        assertEquals(1, backs)
+    }
+
+    @Test
+    fun `an error shows a message`() {
+        setContent(EditTaskUiState.Error)
+
+        composeRule.onNodeWithText("This task couldn't be loaded.").assertExists()
+    }
+
+    @Test
+    fun `a message shows in a snackbar, then is marked shown`() {
+        setContent(existingTask.copy(message = EditTaskMessage.SaveFailed))
+
+        composeRule.onNodeWithText("Couldn't save the task. Try again.").assertExists()
+        assertEquals(0, messagesShown)
+
+        // A short snackbar dismisses itself after 4 seconds.
+        composeRule.mainClock.advanceTimeBy(5_000)
+
+        assertEquals(1, messagesShown)
     }
 }
