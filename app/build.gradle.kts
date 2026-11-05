@@ -52,6 +52,12 @@ android {
     }
 }
 
+composeCompiler {
+    stabilityConfigurationFiles.add(layout.projectDirectory.file("compose_stability.conf"))
+    reportsDestination = layout.buildDirectory.dir("compose_metrics")
+    metricsDestination = layout.buildDirectory.dir("compose_metrics")
+}
+
 room3 {
     schemaDirectory("$projectDir/schemas")
 }
@@ -97,6 +103,8 @@ dependencies {
     testImplementation(libs.androidx.test.core)
     testImplementation(libs.ktor.client.mock)
     testImplementation(libs.mockk)
+    testImplementation(platform(libs.androidx.compose.bom))
+    testImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))
