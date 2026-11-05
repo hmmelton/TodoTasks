@@ -3,6 +3,7 @@ package com.harrison.todotasks.ui.edittask
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsNotSelected
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
@@ -132,6 +133,45 @@ class EditTaskContentTest {
         composeRule.onNode(hasSetTextAction() and hasText("Description")).performTextInput("Sunday")
 
         assertEquals(listOf("Sunday"), descriptions)
+    }
+
+    @Test
+    fun `the due date can be confirmed in the date picker or cleared`() {
+        setContent(existingTask)
+
+        composeRule.onNodeWithText("Pick date…")
+            .assertIsSelected()
+            .performScrollTo()
+            .performClick()
+        composeRule.onNodeWithText("OK").performClick()
+        composeRule.onNodeWithContentDescription("Clear due date").performScrollTo().performClick()
+
+        // The picker starts on the due date, so confirming it keeps the same midnight UTC.
+        assertEquals(listOf(dueAt, null), dueDates)
+    }
+
+    @Test
+    fun `the Today and Tomorrow chips set the due date`() {
+        setContent(newTask)
+
+        composeRule.onNodeWithText("Today").performScrollTo().performClick()
+        composeRule.onNodeWithText("Tomorrow").performScrollTo().performClick()
+
+        assertEquals(listOf(midnightUtc(today), midnightUtc(today.plusDays(1))), dueDates)
+    }
+
+    @Test
+    fun `the chip for the current due date is selected, and choosing it again clears it`() {
+        setContent(existingTask.copy(dueAt = midnightUtc(today.plusDays(1))))
+
+        composeRule.onNodeWithText("Today").assertIsNotSelected()
+        composeRule.onNodeWithText("Pick date…").assertIsNotSelected()
+        composeRule.onNodeWithText("Tomorrow")
+            .assertIsSelected()
+            .performScrollTo()
+            .performClick()
+
+        assertEquals(listOf<Long?>(null), dueDates)
     }
 
     @Test
