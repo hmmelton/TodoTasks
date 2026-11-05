@@ -33,6 +33,9 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -43,7 +46,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
@@ -65,6 +70,7 @@ import java.time.ZoneOffset
 
 private const val TASK_CONTENT_TYPE = "task"
 private const val COMPLETED_HEADER_KEY = "completed-header"
+private const val EMPTY_MESSAGE_CONTENT_TYPE = "empty-message"
 
 /** A task card's padding, narrow at the start, where the checkbox's touch target leaves room. */
 private val TaskCardPadding = PaddingValues(start = 4.dp, top = 8.dp, end = 16.dp, bottom = 8.dp)
@@ -111,6 +117,7 @@ fun TaskListScreen(
         onCompleteChange = viewModel::onCompleteChange,
         onAddTask = onAddTask,
         onMessageShown = viewModel::onMessageShown,
+        onRefresh = viewModel::onRefresh,
         modifier = modifier,
     )
 }
@@ -121,6 +128,7 @@ fun TaskListScreen(
  * then [onMessageShown] is called.
  *
  * @param today The device's current date, which due dates are labeled and flagged overdue against.
+ * @param onRefresh Syncs the tasks, when the list, or its empty state, is pulled down.
  */
 @Composable
 fun TaskListContent(
@@ -130,6 +138,7 @@ fun TaskListContent(
     onCompleteChange: (id: String, isComplete: Boolean) -> Unit,
     onAddTask: () -> Unit,
     onMessageShown: () -> Unit,
+    onRefresh: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
@@ -167,16 +176,14 @@ fun TaskListContent(
         when (uiState) {
             TaskListUiState.Loading -> CenteredBox(innerPadding) { CircularProgressIndicator() }
             TaskListUiState.Error -> CenteredMessage(R.string.task_list_error, innerPadding)
-            is TaskListUiState.Content -> when {
-                uiState.tasks.isEmpty() -> CenteredMessage(R.string.task_list_empty, innerPadding)
-                else -> TaskList(
-                    content = uiState,
-                    dueDates = dueDates,
-                    onTaskClick = onTaskClick,
-                    onCompleteChange = onCompleteChange,
-                    contentPadding = innerPadding,
-                )
-            }
+            is TaskListUiState.Content -> RefreshableTasks(
+                content = uiState,
+                dueDates = dueDates,
+                onTaskClick = onTaskClick,
+                onCompleteChange = onCompleteChange,
+                onRefresh = onRefresh,
+                contentPadding = innerPadding,
+            )
         }
     }
 }
@@ -192,6 +199,76 @@ private fun TaskListTopBar() {
             titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
         ),
     )
+}
+
+/**
+ * The tasks of [content], or the empty state when there are none, either of which can be pulled down
+ * to call [onRefresh]. The indicator shows while [TaskListUiState.Content.isSyncing], and starts
+ * below the app bar. A Sync custom action calls [onRefresh] too, for anyone who can't make the
+ * gesture, since the box offers no accessibility action of its own.
+ */
+@Composable
+private fun RefreshableTasks(
+    content: TaskListUiState.Content,
+    dueDates: DueDates,
+    onTaskClick: (id: String) -> Unit,
+    onCompleteChange: (id: String, isComplete: Boolean) -> Unit,
+    onRefresh: () -> Unit,
+    contentPadding: PaddingValues,
+) {
+    val state = rememberPullToRefreshState()
+    val syncLabel = stringResource(R.string.task_list_sync)
+    PullToRefreshBox(
+        isRefreshing = content.isSyncing,
+        onRefresh = onRefresh,
+        modifier = Modifier
+            .fillMaxSize()
+            .semantics {
+                customActions = listOf(
+                    CustomAccessibilityAction(syncLabel) {
+                        onRefresh()
+                        true
+                    },
+                )
+            },
+        state = state,
+        indicator = {
+            PullToRefreshDefaults.Indicator(
+                state = state,
+                isRefreshing = content.isSyncing,
+                // The list scrolls under the app bar, so the indicator is moved down out from it.
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = contentPadding.calculateTopPadding()),
+            )
+        },
+    ) {
+        when {
+            content.tasks.isEmpty() -> EmptyTaskList(contentPadding)
+            else -> TaskList(
+                content = content,
+                dueDates = dueDates,
+                onTaskClick = onTaskClick,
+                onCompleteChange = onCompleteChange,
+                contentPadding = contentPadding,
+            )
+        }
+    }
+}
+
+/**
+ * The message that there are no tasks, centered in a list of its own so that it can still be pulled
+ * to refresh, which a new device does to fetch its tasks.
+ */
+@Composable
+private fun EmptyTaskList(contentPadding: PaddingValues) {
+    LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = contentPadding) {
+        item(contentType = EMPTY_MESSAGE_CONTENT_TYPE) {
+            Box(modifier = Modifier.fillParentMaxSize(), contentAlignment = Alignment.Center) {
+                StateMessage(R.string.task_list_empty)
+            }
+        }
+    }
 }
 
 /** The tasks of [content], in display order, with the completed ones under their own heading. */
@@ -403,15 +480,19 @@ private fun CenteredMessage(
     @StringRes text: Int,
     contentPadding: PaddingValues,
 ) {
-    CenteredBox(contentPadding) {
-        Text(
-            text = stringResource(text),
-            modifier = Modifier.padding(Dimens.StateMessagePadding),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-            style = MaterialTheme.typography.bodyLarge,
-        )
-    }
+    CenteredBox(contentPadding) { StateMessage(text) }
+}
+
+/** A message that fills the screen in place of the tasks, such as an empty or error state. */
+@Composable
+private fun StateMessage(@StringRes text: Int) {
+    Text(
+        text = stringResource(text),
+        modifier = Modifier.padding(Dimens.StateMessagePadding),
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        textAlign = TextAlign.Center,
+        style = MaterialTheme.typography.bodyLarge,
+    )
 }
 
 @Composable
@@ -460,6 +541,7 @@ private fun TaskListPreview(uiState: TaskListUiState, darkTheme: Boolean) {
             onCompleteChange = { _, _ -> },
             onAddTask = {},
             onMessageShown = {},
+            onRefresh = {},
         )
     }
 }
@@ -474,6 +556,12 @@ private fun TaskListContentPreview() {
 @Composable
 private fun TaskListContentDarkPreview() {
     TaskListPreview(TaskListUiState.Content(previewTasks), darkTheme = true)
+}
+
+@Preview(name = "Syncing")
+@Composable
+private fun TaskListSyncingPreview() {
+    TaskListPreview(TaskListUiState.Content(previewTasks, isSyncing = true), darkTheme = false)
 }
 
 @Preview(name = "Empty")

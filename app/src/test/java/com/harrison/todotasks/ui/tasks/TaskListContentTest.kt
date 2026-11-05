@@ -1,5 +1,8 @@
 package com.harrison.todotasks.ui.tasks
 
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.getBoundsInRoot
@@ -8,6 +11,9 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performCustomAccessibilityActionWithLabel
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeDown
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import com.harrison.todotasks.data.local.fullTask
 import java.time.LocalDate
@@ -18,6 +24,9 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+
+/** Where a pull starts, as a fraction of the refresh box's height down from its top. */
+private const val PULL_START_FRACTION = 0.3f
 
 /** Checks what the task list shows for each state, and which callbacks its controls call. */
 @RunWith(RobolectricTestRunner::class)
@@ -53,6 +62,22 @@ class TaskListContentTest {
     private val completeChanges = mutableListOf<Pair<String, Boolean>>()
     private var addClicks = 0
     private var messagesShown = 0
+    private var refreshes = 0
+
+    private val indeterminateProgress = hasProgressBarRangeInfo(ProgressBarRangeInfo.Indeterminate)
+
+    // Only the refresh box has the Sync action, so this finds the box around the list.
+    private val refreshBox = SemanticsMatcher.keyIsDefined(SemanticsActions.CustomActions)
+
+    /**
+     * Drags from below the app bar, which blocks touches, to the bottom of the screen. That's past
+     * the refresh threshold, since the indicator moves half as far as the finger.
+     */
+    private fun pullDown() {
+        composeRule.onNode(refreshBox).performTouchInput {
+            swipeDown(startY = height * PULL_START_FRACTION, endY = bottom)
+        }
+    }
 
     private fun setContent(uiState: TaskListUiState) {
         composeRule.setContent {
@@ -63,6 +88,7 @@ class TaskListContentTest {
                 onCompleteChange = { id, isComplete -> completeChanges += id to isComplete },
                 onAddTask = { addClicks++ },
                 onMessageShown = { messagesShown++ },
+                onRefresh = { refreshes++ },
             )
         }
     }
@@ -71,9 +97,7 @@ class TaskListContentTest {
     fun `loading shows a progress indicator`() {
         setContent(TaskListUiState.Loading)
 
-        composeRule
-            .onNode(hasProgressBarRangeInfo(ProgressBarRangeInfo.Indeterminate))
-            .assertExists()
+        composeRule.onNode(indeterminateProgress).assertExists()
     }
 
     @Test
@@ -209,5 +233,47 @@ class TaskListContentTest {
         composeRule.mainClock.advanceTimeBy(5_000)
 
         assertEquals(1, messagesShown)
+    }
+
+    @Test
+    fun `pulling the list down refreshes`() {
+        setContent(TaskListUiState.Content(tasks = listOf(openTask, doneTask)))
+
+        pullDown()
+
+        assertEquals(1, refreshes)
+    }
+
+    @Test
+    fun `pulling the empty state down refreshes`() {
+        setContent(TaskListUiState.Content(tasks = emptyList()))
+
+        pullDown()
+
+        assertEquals(1, refreshes)
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `the sync action refreshes without the gesture`() {
+        setContent(TaskListUiState.Content(tasks = listOf(openTask)))
+
+        composeRule.onNode(refreshBox).performCustomAccessibilityActionWithLabel("Sync")
+
+        assertEquals(1, refreshes)
+    }
+
+    @Test
+    fun `the refresh indicator shows while syncing`() {
+        setContent(TaskListUiState.Content(tasks = listOf(openTask), isSyncing = true))
+
+        composeRule.onNode(indeterminateProgress).assertExists()
+    }
+
+    @Test
+    fun `the refresh indicator is hidden when not syncing`() {
+        setContent(TaskListUiState.Content(tasks = listOf(openTask)))
+
+        composeRule.onNode(indeterminateProgress).assertDoesNotExist()
     }
 }
