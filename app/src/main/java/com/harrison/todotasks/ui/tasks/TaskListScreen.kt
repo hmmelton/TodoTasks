@@ -20,12 +20,24 @@ import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ChipColors
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -38,12 +50,15 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.harrison.todotasks.R
 import com.harrison.todotasks.data.model.TodoTask
 import com.harrison.todotasks.ui.DueDates
 import com.harrison.todotasks.ui.rememberDueDateFormatter
 import com.harrison.todotasks.ui.theme.Dimens
 import java.time.Instant
+import java.time.LocalDate
 
 private const val TASK_CONTENT_TYPE = "task"
 private const val COMPLETED_HEADER_KEY = "completed-header"
@@ -71,6 +86,110 @@ private val FabMargin = 16.dp
 
 /** The room under the last task: the button, its margin, and a screen padding above it. */
 private val FabClearance = FabMargin + FabHeight + Dimens.ScreenPadding
+
+/**
+ * The task list screen, backed by [viewModel].
+ *
+ * @param onTaskClick Opens the task with the given ID for editing.
+ * @param onAddTask Opens the form for adding a task.
+ */
+@Composable
+fun TaskListScreen(
+    onTaskClick: (id: String) -> Unit,
+    onAddTask: () -> Unit,
+    modifier: Modifier = Modifier,
+    viewModel: TaskListViewModel = hiltViewModel(),
+) {
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    TaskListContent(
+        uiState = uiState,
+        today = LocalDate.now(),
+        onTaskClick = onTaskClick,
+        onCompleteChange = viewModel::onCompleteChange,
+        onAddTask = onAddTask,
+        onMessageShown = viewModel::onMessageShown,
+        modifier = modifier,
+    )
+}
+
+/**
+ * Shows [uiState]: the incomplete tasks, then the completed ones, each of which can be completed
+ * or opened, with a button that adds one. A [TaskListUiState.Content.message] shows in a snackbar,
+ * then [onMessageShown] is called.
+ *
+ * @param today The device's current date, which due dates are labeled and flagged overdue against.
+ */
+@Composable
+fun TaskListContent(
+    uiState: TaskListUiState,
+    today: LocalDate,
+    onTaskClick: (id: String) -> Unit,
+    onCompleteChange: (id: String, isComplete: Boolean) -> Unit,
+    onAddTask: () -> Unit,
+    onMessageShown: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val snackbarHostState = remember { SnackbarHostState() }
+    val message = (uiState as? TaskListUiState.Content)?.message
+    val messageText = when (message) {
+        TaskListMessage.CompleteChangeFailed ->
+            stringResource(R.string.task_list_complete_change_failed)
+        null -> null
+    }
+    // The snackbar shows for seconds, so the effect calls the latest callback without restarting.
+    val currentOnMessageShown by rememberUpdatedState(onMessageShown)
+    LaunchedEffect(message) {
+        if (messageText != null) {
+            snackbarHostState.showSnackbar(messageText)
+            currentOnMessageShown()
+        }
+    }
+    // Keeps the same instance for the same day, so task cards can skip recomposing.
+    val dueDates = remember(today) { DueDates(today) }
+
+    Scaffold(
+        modifier = modifier,
+        topBar = { TaskListTopBar() },
+        floatingActionButton = {
+            FloatingActionButton(onClick = onAddTask) {
+                Icon(
+                    painter = painterResource(R.drawable.ic_add),
+                    contentDescription = stringResource(R.string.task_list_add),
+                )
+            }
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+    ) { innerPadding ->
+        when (uiState) {
+            TaskListUiState.Loading -> CenteredBox(innerPadding) { CircularProgressIndicator() }
+            TaskListUiState.Error -> CenteredMessage(R.string.task_list_error, innerPadding)
+            is TaskListUiState.Content -> when {
+                uiState.tasks.isEmpty() -> CenteredMessage(R.string.task_list_empty, innerPadding)
+                else -> TaskList(
+                    content = uiState,
+                    dueDates = dueDates,
+                    onTaskClick = onTaskClick,
+                    onCompleteChange = onCompleteChange,
+                    contentPadding = innerPadding,
+                )
+            }
+        }
+    }
+}
+
+/** The cobalt app bar that titles the list. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TaskListTopBar() {
+    CenterAlignedTopAppBar(
+        title = { Text(stringResource(R.string.task_list_title)) },
+        colors = TopAppBarDefaults.topAppBarColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer,
+            titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+        ),
+    )
+}
 
 /** The tasks of [content], in display order, with the completed ones under their own heading. */
 @Composable
