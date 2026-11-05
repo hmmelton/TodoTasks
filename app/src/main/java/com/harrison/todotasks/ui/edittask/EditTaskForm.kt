@@ -4,8 +4,16 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -14,19 +22,39 @@ import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextFieldColors
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import com.harrison.todotasks.R
 import com.harrison.todotasks.ui.DueDates
 import com.harrison.todotasks.ui.rememberDueDateFormatter
+import com.harrison.todotasks.ui.theme.Dimens
 import java.time.Instant
+import java.time.LocalDate
+
+/** The gap between the card of fields and the Save button. */
+private val SaveButtonGap = 16.dp
+
+/** The padding inside the card of fields. */
+private val FieldsCardPadding = 16.dp
+
+/** The gap between the fields in the card. */
+private val FieldGap = 16.dp
 
 /** The gap between the due date summary and the choices under it. */
 private val DueDateSummaryGap = 4.dp
@@ -36,6 +64,141 @@ private val DueDateSummaryMinHeight = 48.dp
 
 /** The gap between the due date choice chips. */
 private val DueDateChoiceGap = 8.dp
+
+/**
+ * The add or edit task form: its fields, grouped in a card, above a Save button that's enabled when
+ * [canSave] and calls [onSave]. The fields are a title, a description, and a due date that is set
+ * to today or tomorrow, picked from a date picker dialog, or cleared.
+ *
+ * [dueAt] is midnight UTC of the due day, which is what the date picker selects, so it round-trips
+ * through the picker unchanged.
+ *
+ * @param today The device's current date, which the Today and Tomorrow choices are based on.
+ */
+@Composable
+fun EditTaskForm(
+    title: String,
+    description: String,
+    dueAt: Long?,
+    today: LocalDate,
+    canSave: Boolean,
+    onTitleChange: (String) -> Unit,
+    onDescriptionChange: (String) -> Unit,
+    onDueAtChange: (Long?) -> Unit,
+    onSave: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var showDatePicker by rememberSaveable { mutableStateOf(false) }
+
+    Column(
+        modifier = modifier.verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(SaveButtonGap),
+    ) {
+        TaskFieldsCard(
+            title = title,
+            description = description,
+            dueAt = dueAt,
+            dueDates = DueDates(today),
+            onTitleChange = onTitleChange,
+            onDescriptionChange = onDescriptionChange,
+            onDueAtChange = onDueAtChange,
+            onPickDueDate = { showDatePicker = true },
+        )
+        Button(
+            onClick = onSave,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = Dimens.ScreenPadding),
+            enabled = canSave,
+        ) {
+            Text(stringResource(R.string.edit_task_save))
+        }
+    }
+
+    if (showDatePicker) {
+        DueDatePickerDialog(
+            dueAt = dueAt,
+            onConfirm = { selected ->
+                onDueAtChange(selected)
+                showDatePicker = false
+            },
+            onDismiss = { showDatePicker = false },
+        )
+    }
+}
+
+/** The title, description, and due date fields, grouped in a card. */
+@Composable
+private fun TaskFieldsCard(
+    title: String,
+    description: String,
+    dueAt: Long?,
+    dueDates: DueDates,
+    onTitleChange: (String) -> Unit,
+    onDescriptionChange: (String) -> Unit,
+    onDueAtChange: (Long?) -> Unit,
+    onPickDueDate: () -> Unit,
+) {
+    val fieldColors = OutlinedTextFieldDefaults.colors(
+        focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
+        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
+    )
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = Dimens.ScreenPadding),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainer,
+        ),
+    ) {
+        Column(
+            modifier = Modifier.padding(FieldsCardPadding),
+            verticalArrangement = Arrangement.spacedBy(FieldGap),
+        ) {
+            TitleField(title, onTitleChange, fieldColors)
+            DescriptionField(description, onDescriptionChange, fieldColors)
+            DueDateField(
+                dueAt = dueAt,
+                dueDates = dueDates,
+                onDueAtChange = onDueAtChange,
+                onPick = onPickDueDate,
+            )
+        }
+    }
+}
+
+/** A single-line title field, whose keyboard action moves on to the description. */
+@Composable
+private fun TitleField(title: String, onTitleChange: (String) -> Unit, colors: TextFieldColors) {
+    OutlinedTextField(
+        value = title,
+        onValueChange = onTitleChange,
+        modifier = Modifier.fillMaxWidth(),
+        label = { Text(stringResource(R.string.edit_task_title_label)) },
+        singleLine = true,
+        keyboardOptions = KeyboardOptions(
+            capitalization = KeyboardCapitalization.Sentences,
+            imeAction = ImeAction.Next,
+        ),
+        colors = colors,
+    )
+}
+
+/** A description field at least three lines tall. */
+@Composable
+private fun DescriptionField(
+    description: String,
+    onDescriptionChange: (String) -> Unit,
+    colors: TextFieldColors,
+) {
+    OutlinedTextField(
+        value = description,
+        onValueChange = onDescriptionChange,
+        modifier = Modifier.fillMaxWidth(),
+        label = { Text(stringResource(R.string.edit_task_description_label)) },
+        minLines = 3,
+        keyboardOptions = KeyboardOptions(
+            capitalization = KeyboardCapitalization.Sentences,
+        ),
+        colors = colors,
+    )
+}
 
 /**
  * The due date, or None, with a button that clears it, above choices for today, tomorrow, or a
