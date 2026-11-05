@@ -1,11 +1,113 @@
 package com.harrison.todotasks.ui.theme
 
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.ui.graphics.Color
 
-val Purple80 = Color(0xFFD0BCFF)
-val PurpleGrey80 = Color(0xFFCCC2DC)
-val Pink80 = Color(0xFFEFB8C8)
+// The cobalt color schemes, generated from the seed #2457F5 with Material Color Utilities'
+// content scheme, which Material Theme Builder uses when it matches the seed color. The content
+// scheme keeps the seed's chroma, so primaryContainer is the seed itself in both themes.
 
-val Purple40 = Color(0xFF6650a4)
-val PurpleGrey40 = Color(0xFF625b71)
-val Pink40 = Color(0xFF7D5260)
+/** The light cobalt color scheme. */
+internal val CobaltLightColorScheme = lightColorScheme(
+    primary = Color(0xFF003ECE),
+    onPrimary = Color(0xFFFFFFFF),
+    primaryContainer = Color(0xFF2457F5),
+    onPrimaryContainer = Color(0xFFE4E6FF),
+    inversePrimary = Color(0xFFB8C4FF),
+    secondary = Color(0xFF495AA0),
+    onSecondary = Color(0xFFFFFFFF),
+    secondaryContainer = Color(0xFFA1B2FF),
+    onSecondaryContainer = Color(0xFF314287),
+    tertiary = Color(0xFF8708A4),
+    onTertiary = Color(0xFFFFFFFF),
+    tertiaryContainer = Color(0xFFA332BF),
+    onTertiaryContainer = Color(0xFFFFDEFF),
+    background = Color(0xFFFBF8FF),
+    onBackground = Color(0xFF191B24),
+    surface = Color(0xFFFBF8FF),
+    onSurface = Color(0xFF191B24),
+    surfaceVariant = Color(0xFFE0E1F5),
+    onSurfaceVariant = Color(0xFF434656),
+    surfaceTint = Color(0xFF0F4CEB),
+    inverseSurface = Color(0xFF2E303A),
+    inverseOnSurface = Color(0xFFF0EFFD),
+    error = Color(0xFFBA1A1A),
+    onError = Color(0xFFFFFFFF),
+    errorContainer = Color(0xFFFFDAD6),
+    onErrorContainer = Color(0xFF93000A),
+    outline = Color(0xFF747687),
+    outlineVariant = Color(0xFFC4C5D8),
+    scrim = Color(0xFF000000),
+    surfaceBright = Color(0xFFFBF8FF),
+    surfaceContainer = Color(0xFFEDEDFA),
+    surfaceContainerHigh = Color(0xFFE7E7F4),
+    surfaceContainerHighest = Color(0xFFE2E1EE),
+    surfaceContainerLow = Color(0xFFF3F2FF),
+    surfaceContainerLowest = Color(0xFFFFFFFF),
+    surfaceDim = Color(0xFFD9D9E6),
+    primaryFixed = Color(0xFFDDE1FF),
+    primaryFixedDim = Color(0xFFB8C4FF),
+    onPrimaryFixed = Color(0xFF001453),
+    onPrimaryFixedVariant = Color(0xFF0037B9),
+    secondaryFixed = Color(0xFFDDE1FF),
+    secondaryFixedDim = Color(0xFFB8C4FF),
+    onSecondaryFixed = Color(0xFF001453),
+    onSecondaryFixedVariant = Color(0xFF304286),
+    tertiaryFixed = Color(0xFFFDD6FF),
+    tertiaryFixedDim = Color(0xFFF4AEFF),
+    onTertiaryFixed = Color(0xFF340042),
+    onTertiaryFixedVariant = Color(0xFF790095),
+)
+
+/** The dark cobalt color scheme. */
+internal val CobaltDarkColorScheme = darkColorScheme(
+    primary = Color(0xFFB8C4FF),
+    onPrimary = Color(0xFF002584),
+    primaryContainer = Color(0xFF2457F5),
+    onPrimaryContainer = Color(0xFFE4E6FF),
+    inversePrimary = Color(0xFF0F4CEB),
+    secondary = Color(0xFFB8C4FF),
+    onSecondary = Color(0xFF172A6E),
+    secondaryContainer = Color(0xFF334489),
+    onSecondaryContainer = Color(0xFFA4B5FF),
+    tertiary = Color(0xFFF4AEFF),
+    onTertiary = Color(0xFF56006A),
+    tertiaryContainer = Color(0xFFA332BF),
+    onTertiaryContainer = Color(0xFFFFDEFF),
+    background = Color(0xFF11131C),
+    onBackground = Color(0xFFE2E1EE),
+    surface = Color(0xFF11131C),
+    onSurface = Color(0xFFE2E1EE),
+    surfaceVariant = Color(0xFF434656),
+    onSurfaceVariant = Color(0xFFC4C5D8),
+    surfaceTint = Color(0xFFB8C4FF),
+    inverseSurface = Color(0xFFE2E1EE),
+    inverseOnSurface = Color(0xFF2E303A),
+    error = Color(0xFFFFB4AB),
+    onError = Color(0xFF690005),
+    errorContainer = Color(0xFF93000A),
+    onErrorContainer = Color(0xFFFFDAD6),
+    outline = Color(0xFF8D90A2),
+    outlineVariant = Color(0xFF434656),
+    scrim = Color(0xFF000000),
+    surfaceBright = Color(0xFF373943),
+    surfaceContainer = Color(0xFF1D1F28),
+    surfaceContainerHigh = Color(0xFF282933),
+    surfaceContainerHighest = Color(0xFF33343E),
+    surfaceContainerLow = Color(0xFF191B24),
+    surfaceContainerLowest = Color(0xFF0C0E16),
+    surfaceDim = Color(0xFF11131C),
+    primaryFixed = Color(0xFFDDE1FF),
+    primaryFixedDim = Color(0xFFB8C4FF),
+    onPrimaryFixed = Color(0xFF001453),
+    onPrimaryFixedVariant = Color(0xFF0037B9),
+    secondaryFixed = Color(0xFFDDE1FF),
+    secondaryFixedDim = Color(0xFFB8C4FF),
+    onSecondaryFixed = Color(0xFF001453),
+    onSecondaryFixedVariant = Color(0xFF304286),
+    tertiaryFixed = Color(0xFFFDD6FF),
+    tertiaryFixedDim = Color(0xFFF4AEFF),
+    onTertiaryFixed = Color(0xFF340042),
+    onTertiaryFixedVariant = Color(0xFF790095),
+)
